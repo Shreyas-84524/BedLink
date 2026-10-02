@@ -14,8 +14,8 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 10 — Frontend Resilience + Complete Mock E2E (Complete & Frozen)
-- **Current Sub-Phase:** Sub-phases 10.1 through 10.8 complete; Frontend officially frozen; awaiting user manual review and Phase 10 approval commit.
+- **Current Phase:** Phase 10 — Frontend Resilience + Complete Mock E2E (Approved & Frozen)
+- **Current Sub-Phase:** Phase 10 complete & approved; frontend Phases 1–10 officially frozen; ready for Phase 11 (Supabase Setup & Auth Integration).
 - **Completed work:**
   - Phases 1 through 9 completed, verified, and approved in Git history.
   - Phase 10 Frontend Resilience + Complete Mock E2E fully implemented & verified:
@@ -51,6 +51,4 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - `PHASE_1_REPORT.md` through `PHASE_10_REPORT.md`
 
 ## Next recommended task
-Awaiting user manual review and approval commit for Phase 10:
-`chore(phase-10): approve frontend freeze`
-Then proceed to Phase 11 — Supabase Foundation & Server-Side Auth.
+Proceed to Phase 11 — Supabase Setup & Auth Integration upon user instruction.
