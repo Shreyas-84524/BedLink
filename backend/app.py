@@ -1,3 +1,4 @@
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
@@ -14,7 +15,27 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+from math import radians, sin, cos, sqrt, atan2
 
+def calculate_distance(lat1, lon1, lat2, lon2):
+    earth_radius = 6371
+
+    lat1, lon1, lat2, lon2 = map(
+        radians, [lat1, lon1, lat2, lon2]
+    )
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    )
+
+    return 2 * earth_radius * atan2(
+        sqrt(a), sqrt(1 - a)
+    )
+    
 @app.route("/")
 def home():
     return jsonify({
@@ -193,6 +214,99 @@ def create_ambulance_request():
             "message": str(e)
         }), 500
 
+@app.route("/match-request/<request_id>", methods=["GET"])
+def match_request(request_id):
+    try:
+        result = (
+            supabase.table("ambulance_requests")
+            .select("*")
+            .eq("id", request_id)
+            .execute()
+        )
+
+        if not result.data:
+            return jsonify({
+                "status": "error",
+                "message": "Ambulance request not found"
+            }), 404
+
+        ambulance = result.data[0]
+
+        # Use the saved request's bed and facility requirements
+        bed_type = ambulance["bed_type"]
+        required_facilities = ambulance.get("required_facilities") or []
+
+        beds = (
+            supabase.table("beds")
+            .select("hospital_id")
+            .eq("bed_type", bed_type)
+            .eq("status", "available")
+            .execute()
+        )
+
+        hospital_ids = list(set(
+            bed["hospital_id"] for bed in beds.data
+        ))
+
+        matches = []
+
+        for hospital_id in hospital_ids:
+            hospital_result = (
+                supabase.table("hospitals")
+                .select("*")
+                .eq("id", hospital_id)
+                .eq("is_active", True)
+                .execute()
+            )
+
+            if not hospital_result.data:
+                continue
+
+            hospital = hospital_result.data[0]
+            facilities = hospital.get("facilities") or []
+
+            if not all(
+                facility in facilities
+                for facility in required_facilities
+            ):
+                continue
+
+            if hospital.get("latitude") is None or hospital.get("longitude") is None:
+             continue
+
+            distance = calculate_distance(
+                float(ambulance["latitude"]),
+                float(ambulance["longitude"]),
+                float(hospital["latitude"]),
+                float(hospital["longitude"])
+            )
+
+            matches.append({
+                "hospital_id": hospital["id"],
+                "name": hospital["name"],
+                "address": hospital["address"],
+                "bed_type": bed_type,
+                "hospital_load": hospital["hospital_load"],
+                "facilities": facilities,
+                "distance_km": round(distance, 2)
+            })
+
+        matches.sort(
+            key=lambda hospital: hospital["distance_km"]
+        )
+
+        return jsonify({
+            "status": "success",
+            "request_id": request_id,
+            "total_matches": len(matches),
+            "hospitals": matches
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
