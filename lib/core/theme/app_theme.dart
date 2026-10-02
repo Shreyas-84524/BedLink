@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'app_typography.dart';
 
-/// Foundation Theme for BedLink clinical high-contrast UI.
+/// Complete ThemeData configuration for BedLink.
 class AppTheme {
   AppTheme._();
 
@@ -14,10 +15,10 @@ class AppTheme {
         secondary: AppColors.secondaryTeal,
         error: AppColors.criticalRed,
         surface: AppColors.surface,
-        onPrimary: AppColors.textOnDark,
-        onSecondary: AppColors.textOnDark,
+        onPrimary: AppColors.textInverse,
+        onSecondary: AppColors.textInverse,
         onSurface: AppColors.textPrimary,
-        onError: AppColors.textOnDark,
+        onError: AppColors.textInverse,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
@@ -25,28 +26,48 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
+        titleTextStyle: AppTypography.screenTitle,
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           side: const BorderSide(color: AppColors.border),
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primarySlate,
-          foregroundColor: AppColors.textOnDark,
-          minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.borderSubtle,
+        thickness: 1,
+        space: 1,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.borderStrong, width: 1.5),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.borderActive, width: 2.0),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.criticalRed, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.criticalDark, width: 2.0),
+        ),
+        labelStyle: AppTypography.label,
+        hintStyle: AppTypography.bodySmall,
       ),
     );
   }

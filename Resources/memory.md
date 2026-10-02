@@ -14,29 +14,31 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 1 (Flutter Project Bootstrap & Core Foundation)
-- **Current Sub-Phase:** 1.8 completed (Phase 1 validation passed)
+- **Current Phase:** Phase 2 (BedLink Design System)
+- **Current Sub-Phase:** 2.8 completed (Interactive Showcase & Component Verification)
 - **Completed work:**
-  - `Resources/Phases.md` reconfigured to 15-phase roadmap with 2-commit per phase rule.
-  - Flutter project created at repository root targeting Android and Web.
-  - Strict static analysis enabled (`strict-casts`, `strict-inference`, `strict-raw-types`).
-  - Foundation dependencies configured (`flutter_riverpod`, `go_router`).
-  - Feature-first folder structure established (`app/`, `core/`, `shared/`, `features/`).
-  - Riverpod root configured with `bootstrap.dart`, `sessionProvider`, and error boundaries.
-  - GoRouter routing established with all required `/`, `/login`, `/ambulance/*`, `/hospital/*` placeholder screens.
-  - 18 unit/widget/routing tests created and verified.
-  - `PHASE_1_REPORT.md` generated.
+  - Phase 1 approved and finalized (`chore(phase-1): approve flutter foundation`).
+  - Sub-phase 2.1: Semantic Color Tokens & Theme Configuration (`lib/core/theme/app_colors.dart`, `semantic_tokens.dart`, `app_theme.dart`).
+  - Sub-phase 2.2: Typography System & Numeric Readouts (`lib/core/theme/app_typography.dart` with Chivo sans-serif & JetBrains Mono tabular figures).
+  - Sub-phase 2.3: Action Components & CTA System (`lib/shared/widgets/buttons/bedlink_button.dart`, `bedlink_icon_button.dart`).
+  - Sub-phase 2.4: Card Hierarchy & Clinical Surfaces (`lib/shared/widgets/cards/bedlink_card.dart`, `bedlink_metric_card.dart`).
+  - Sub-phase 2.5: Status Badges, Indicators & Semantic Chips (`lib/shared/widgets/badges/bedlink_badge.dart`, `status_badges.dart`).
+  - Sub-phase 2.6: Form Controls, Steppers & Clinical Inputs (`lib/shared/widgets/inputs/` text field, search field, segmented selector, counter control, option card, chips, validation messages).
+  - Sub-phase 2.7: Application Chrome, App Bars & Persistent Badges (`lib/shared/widgets/chrome/` logo, live indicator badge, app bar).
+  - Sub-phase 2.8: Interactive Design System Showcase & Validation (`lib/features/design_system/` catalog route `/design-system`, responsive layout tests).
+  - `PHASE_2_REPORT.md` generated.
 
 ## Verification results
 - `flutter analyze`: 0 issues found (strict mode enabled).
-- `flutter test`: 18/18 tests passed across 4 test suites.
+- `flutter test`: 46/46 tests passed across 9 test suites.
 - `flutter build web`: Built cleanly to `build/web`.
 
 ## Current files
-- `pubspec.yaml`, `analysis_options.yaml`
-- `lib/main.dart`, `lib/app/*`, `lib/core/*`, `lib/shared/*`, `lib/features/*`
-- `test/widget_test.dart`, `test/app/router_test.dart`, `test/shared/session_provider_test.dart`, `test/core/constants_test.dart`
-- `PHASE_1_REPORT.md`, `Resources/Phases.md`
+- `lib/core/theme/*`
+- `lib/shared/widgets/badges/*`, `lib/shared/widgets/buttons/*`, `lib/shared/widgets/cards/*`, `lib/shared/widgets/chrome/*`, `lib/shared/widgets/inputs/*`, `lib/shared/widgets/app_scaffold.dart`
+- `lib/features/design_system/*`
+- `test/core/theme_test.dart`, `test/shared/buttons_test.dart`, `test/shared/cards_test.dart`, `test/shared/badges_test.dart`, `test/shared/inputs_test.dart`, `test/features/design_system/design_system_screen_test.dart`
+- `PHASE_2_REPORT.md`
 
 ## Next recommended task
-Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-1): approve flutter foundation`, then proceed to Phase 2 (BedLink Design System).
+Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-2): approve bedlink design system`, then proceed to Phase 3 (Authentication & Navigation Shell).

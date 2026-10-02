@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/providers/session_provider.dart';
+import '../../../../shared/widgets/buttons/bedlink_button.dart';
+import '../../../../shared/widgets/chrome/bedlink_logo.dart';
+import '../../../../shared/widgets/chrome/med_net_live_badge.dart';
 
 class SplashPlaceholderScreen extends ConsumerWidget {
   const SplashPlaceholderScreen({super.key});
@@ -20,41 +24,19 @@ class SplashPlaceholderScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySlate,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.local_hospital_rounded,
-                  size: 40,
-                  color: AppColors.secondaryTeal,
-                ),
-              ),
+              const BedLinkLogo(showTagline: true),
+              const SizedBox(height: 16),
+              const MedNetLiveBadge(isLive: true),
               const SizedBox(height: 24),
-              const Text(
-                AppConstants.appName,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primarySlate,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
               const Text(
                 AppConstants.appTagline,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
+                style: AppTypography.body,
               ),
               const SizedBox(height: 40),
-              ElevatedButton(
+              BedLinkButton(
+                label: 'Enter Application',
+                icon: Icons.login_rounded,
                 onPressed: () {
                   if (session.role.isAmbulance) {
                     context.go('/ambulance');
@@ -64,7 +46,13 @@ class SplashPlaceholderScreen extends ConsumerWidget {
                     context.go('/login');
                   }
                 },
-                child: const Text('Enter Application'),
+              ),
+              const SizedBox(height: 12),
+              BedLinkButton(
+                label: 'Design System Showcase',
+                variant: BedLinkButtonVariant.secondary,
+                icon: Icons.palette_outlined,
+                onPressed: () => context.go('/design-system'),
               ),
             ],
           ),

@@ -6,6 +6,7 @@ import '../features/ambulance/presentation/screens/bed_requirements_screen.dart'
 import '../features/ambulance/presentation/screens/patient_intake_screen.dart';
 import '../features/auth/presentation/screens/login_placeholder_screen.dart';
 import '../features/auth/presentation/screens/splash_placeholder_screen.dart';
+import '../features/design_system/presentation/screens/design_system_screen.dart';
 import '../features/hospital/presentation/screens/hospital_dashboard_screen.dart';
 import '../features/hospital/presentation/screens/hospital_holds_screen.dart';
 import '../features/hospital/presentation/screens/hospital_requests_screen.dart';
@@ -29,6 +30,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'login',
         builder: (BuildContext context, GoRouterState state) =>
             const LoginPlaceholderScreen(),
+      ),
+      GoRoute(
+        path: '/design-system',
+        name: 'design_system',
+        builder: (BuildContext context, GoRouterState state) =>
+            const DesignSystemScreen(),
       ),
       // Ambulance Flow Routes
       GoRoute(
