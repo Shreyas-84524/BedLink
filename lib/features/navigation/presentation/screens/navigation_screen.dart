@@ -29,7 +29,14 @@ class NavigationScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('WORKFLOW STEP 05', style: AppTypography.operationalLabel),
+                      Expanded(
+                        child: Text(
+                          'WORKFLOW STEP 05',
+                          style: AppTypography.operationalLabel,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: 8),
                       BedLinkBadge(
                         label: 'PHASE 9 SCOPE',
                       ),
