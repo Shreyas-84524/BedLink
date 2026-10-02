@@ -29,7 +29,14 @@ class HospitalDiscoveryScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('WORKFLOW STEP 03', style: AppTypography.operationalLabel),
+                      Flexible(
+                        child: Text(
+                          'WORKFLOW STEP 03',
+                          style: AppTypography.operationalLabel,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: 8),
                       BedLinkBadge(
                         label: 'PHASE 6 SCOPE',
                       ),

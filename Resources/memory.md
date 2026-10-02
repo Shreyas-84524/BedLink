@@ -14,25 +14,25 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 4 — Ambulance Patient Intake
-- **Current Sub-Phase:** 4.8 completed (Complete Intake Screen Integration & Responsive Widget Tests)
+- **Current Phase:** Phase 5 — Bed Need Assessment
+- **Current Sub-Phase:** 5.8 completed (Verification & Complete Integration)
 - **Completed work:**
-  - Phase 1, 2 & 3 completed and approved.
-  - Sub-phase 4.1: Active Intake Header (`lib/features/ambulance/presentation/widgets/intake_header.dart`).
-  - Sub-phase 4.2: Patient Identity Section (`lib/features/ambulance/presentation/widgets/patient_identity_section.dart`).
-  - Sub-phase 4.3: Biological Sex Selection (`lib/features/ambulance/presentation/widgets/biological_sex_selector.dart`, `lib/features/ambulance/domain/models/biological_sex.dart`).
-  - Sub-phase 4.4: Patient Age Selector & Demographic Cohorts (`lib/features/ambulance/presentation/widgets/patient_age_selector.dart`).
-  - Sub-phase 4.5: Clinical Urgency / ESI Acuity Selector (`lib/features/ambulance/presentation/widgets/clinical_urgency_selector.dart`, `lib/features/ambulance/domain/models/clinical_urgency.dart`).
-  - Sub-phase 4.6: Chief Complaint & Diagnostic Notes (`lib/features/ambulance/presentation/widgets/chief_complaint_section.dart`).
-  - Sub-phase 4.7: Riverpod Intake State Management & Form Validation (`lib/features/ambulance/domain/models/patient_intake.dart`, `lib/features/ambulance/presentation/providers/intake_provider.dart`, `test/features/ambulance/intake_provider_test.dart`).
-  - Sub-phase 4.8: Complete Intake Screen Integration & Responsive Widget Tests (`lib/features/ambulance/presentation/screens/patient_intake_screen.dart`, `test/features/ambulance/patient_intake_screen_test.dart`).
-  - `PHASE_4_REPORT.md` and `PHASE_4_RECOVERY_AUDIT.md` generated.
+  - Phases 1, 2, 3 & 4 completed and committed.
+  - Sub-phase 5.1: Patient Summary Banner (`lib/features/ambulance/presentation/widgets/intake_patient_summary_card.dart` reading `patientIntakeProvider`).
+  - Sub-phase 5.2: Clinical Resource Search (`lib/features/ambulance/presentation/widgets/clinical_resource_search_section.dart` with instant clear & autocomplete).
+  - Sub-phase 5.3: Auto-Suggest Clinical Resources (`lib/features/ambulance/presentation/widgets/clinical_resource_suggestions.dart` dynamically suggesting resources based on patient chief complaint).
+  - Sub-phase 5.4: Active Requirement Chips (`lib/features/ambulance/presentation/widgets/active_requirements_section.dart` with BedLinkRequirementChip, quantity adjusters, and clear all).
+  - Sub-phase 5.5: Frequent Requirement Shortcuts / Emergency Preset Bundles (`lib/features/ambulance/presentation/widgets/emergency_presets_section.dart` with Cardiac Emergency, Polytrauma ICU, Respiratory Failure, Pediatric ICU).
+  - Sub-phase 5.6: BedLink Clinical Resource Catalogue (`lib/features/ambulance/domain/models/clinical_resource.dart`, `lib/features/ambulance/domain/models/clinical_resource_catalogue.dart`).
+  - Sub-phase 5.7: Riverpod Requirement State & Hard-Filter Validation (`lib/features/ambulance/domain/models/bed_requirement_state.dart`, `lib/features/ambulance/presentation/providers/requirement_provider.dart`, enforcing rule: at least one countable bed/equipment required).
+  - Sub-phase 5.8: Screen Integration, Responsive Testing & Quality Gates (`lib/features/ambulance/presentation/screens/bed_requirements_screen.dart`, `test/features/ambulance/requirement_provider_test.dart`, `test/features/ambulance/bed_requirements_screen_test.dart`).
+  - `PHASE_5_REPORT.md` generated at root.
 
 ## Verification results
-- `flutter analyze`: 0 issues found (strict mode enabled).
-- `flutter test`: 69/69 tests passed across 13 test suites (100% pass rate).
+- `flutter analyze`: 0 issues found (strict analysis enabled).
+- `flutter test`: 87/87 tests passed across 15 suites (100% pass rate).
 - `flutter build web`: Built cleanly to `build/web`.
-- Compact viewport validation: 320dp, 360dp, and 390dp width verified without RenderFlex overflow.
+- Compact viewport validation: 320dp, 360dp, 400dp widths verified with zero RenderFlex overflow.
 
 ## Current files
 - `lib/core/theme/*`
@@ -44,7 +44,7 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - `lib/features/design_system/*`
 - `lib/app/router.dart`, `lib/app/app.dart`, `lib/main.dart`
 - `test/*`
-- `PHASE_1_REPORT.md`, `PHASE_2_REPORT.md`, `PHASE_3_REPORT.md`, `PHASE_4_REPORT.md`, `PHASE_4_RECOVERY_AUDIT.md`
+- `PHASE_1_REPORT.md`, `PHASE_2_REPORT.md`, `PHASE_3_REPORT.md`, `PHASE_4_REPORT.md`, `PHASE_4_RECOVERY_AUDIT.md`, `PHASE_5_REPORT.md`
 
 ## Next recommended task
-Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-4): approve ambulance patient intake`, then proceed to Phase 5 (Bed Need Assessment).
+Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-5): approve bed need assessment`, then proceed to Phase 6 (Hospital Discovery & Match Grid Frontend).

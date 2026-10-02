@@ -121,7 +121,7 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
             child: MedNetLiveBadge(),
           ),
         ],
-        if (session.role.isAuthenticated && screenWidth >= 400) ...[
+        if (session.role.isAuthenticated && screenWidth >= 520) ...[
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Container(
