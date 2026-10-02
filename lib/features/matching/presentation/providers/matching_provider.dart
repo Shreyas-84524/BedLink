@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/errors/app_exception.dart';
+import '../../../hospital/presentation/providers/hospital_repository_provider.dart';
 import '../../data/mock_hospital_data.dart';
 import '../../domain/models/hospital_match.dart';
 
@@ -21,10 +23,18 @@ class MatchingState {
     required this.fixtureMode,
     required this.activeFilter,
     required this.hasSearched,
+    this.isRealBackend = false,
+    this.dataSourceLabel = 'MOCK_FIXTURE',
+    this.errorMessage,
+    this.isRlsBlocked = false,
   });
 
   /// Initial state: ready with standard candidates or auto-searching.
-  factory MatchingState.initial({bool startSearching = false}) {
+  factory MatchingState.initial({
+    bool startSearching = false,
+    bool isRealBackend = false,
+    String dataSourceLabel = 'MOCK_FIXTURE',
+  }) {
     return MatchingState(
       isSearching: startSearching,
       searchRadiusKm: 15,
@@ -33,6 +43,8 @@ class MatchingState {
       fixtureMode: MatchingFixtureMode.standardFive,
       activeFilter: 'ALL',
       hasSearched: true,
+      isRealBackend: isRealBackend,
+      dataSourceLabel: dataSourceLabel,
     );
   }
 
@@ -56,6 +68,18 @@ class MatchingState {
 
   /// Whether at least one search run has completed.
   final bool hasSearched;
+
+  /// Whether candidate data was retrieved from the live Supabase backend.
+  final bool isRealBackend;
+
+  /// Human-readable data source label ('MOCK_FIXTURE' vs 'SUPABASE_CLOUD').
+  final String dataSourceLabel;
+
+  /// Optional error or diagnostic message (e.g. RLS blocked).
+  final String? errorMessage;
+
+  /// Whether queries to the live backend were blocked by Row-Level Security (default deny).
+  final bool isRlsBlocked;
 
   /// Top recommended #1 candidate, if any.
   HospitalMatch? get primaryMatch => matches.isNotEmpty ? matches.first : null;
@@ -98,6 +122,10 @@ class MatchingState {
     MatchingFixtureMode? fixtureMode,
     String? activeFilter,
     bool? hasSearched,
+    bool? isRealBackend,
+    String? dataSourceLabel,
+    String? errorMessage,
+    bool? isRlsBlocked,
   }) {
     return MatchingState(
       isSearching: isSearching ?? this.isSearching,
@@ -108,6 +136,10 @@ class MatchingState {
       fixtureMode: fixtureMode ?? this.fixtureMode,
       activeFilter: activeFilter ?? this.activeFilter,
       hasSearched: hasSearched ?? this.hasSearched,
+      isRealBackend: isRealBackend ?? this.isRealBackend,
+      dataSourceLabel: dataSourceLabel ?? this.dataSourceLabel,
+      errorMessage: errorMessage ?? this.errorMessage,
+      isRlsBlocked: isRlsBlocked ?? this.isRlsBlocked,
     );
   }
 
@@ -121,7 +153,11 @@ class MatchingState {
         listEquals(other.matches, matches) &&
         other.fixtureMode == fixtureMode &&
         other.activeFilter == activeFilter &&
-        other.hasSearched == hasSearched;
+        other.hasSearched == hasSearched &&
+        other.isRealBackend == isRealBackend &&
+        other.dataSourceLabel == dataSourceLabel &&
+        other.errorMessage == errorMessage &&
+        other.isRlsBlocked == isRlsBlocked;
   }
 
   @override
@@ -133,6 +169,10 @@ class MatchingState {
         fixtureMode,
         activeFilter,
         hasSearched,
+        isRealBackend,
+        dataSourceLabel,
+        errorMessage,
+        isRlsBlocked,
       );
 }
 
@@ -140,7 +180,11 @@ class MatchingState {
 class MatchingNotifier extends Notifier<MatchingState> {
   @override
   MatchingState build() {
-    return MatchingState.initial();
+    final repository = ref.watch(hospitalRepositoryProvider);
+    return MatchingState.initial(
+      isRealBackend: repository.isRealBackend,
+      dataSourceLabel: repository.dataSourceName,
+    );
   }
 
   /// Sets the fixture scenario mode (5 matches, 1 match, 0 matches) for testing & edge cases.
@@ -164,7 +208,11 @@ class MatchingNotifier extends Notifier<MatchingState> {
     );
   }
 
-  /// Triggers simulated searching progression across radius thresholds (5km -> 10km -> 15km).
+  /// Triggers searching progression across radius thresholds (5km -> 10km -> 15km).
+  ///
+  /// When backed by [SupabaseHospitalRepository], loads real hospital facilities.
+  /// If blocked by RLS (0 policies default-deny), gracefully falls back to mock candidates
+  /// and marks [MatchingState.isRlsBlocked] without crashing.
   Future<void> runSearchProgression({
     Duration stepDuration = const Duration(milliseconds: 600),
   }) async {
@@ -192,12 +240,77 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
     state = state.copyWith(
       searchRadiusKm: 15,
-      searchingProgressMessage: 'Evaluating Hinduja, KEM, Lilavati road travel times...',
+      searchingProgressMessage: 'Evaluating candidate road travel times...',
     );
 
     if (stepDuration > Duration.zero) {
       await Future<void>.delayed(stepDuration);
       if (!state.isSearching) return;
+    }
+
+    final repository = ref.read(hospitalRepositoryProvider);
+
+    // If using real backend and in standard mode, attempt to load real hospitals from Supabase
+    if (state.fixtureMode == MatchingFixtureMode.standardFive && repository.isRealBackend) {
+      try {
+        final realHospitals = await repository.getHospitals(activeOnly: true);
+        if (realHospitals.isNotEmpty) {
+          state = state.copyWith(
+            isSearching: false,
+            searchRadiusKm: 15,
+            searchingProgressMessage: '${realHospitals.length} Mumbai hospitals loaded from Supabase',
+            matches: realHospitals,
+            hasSearched: true,
+            isRealBackend: true,
+            dataSourceLabel: repository.dataSourceName,
+            isRlsBlocked: false,
+            errorMessage: null,
+          );
+          return;
+        } else {
+          // Zero records returned: likely default-deny RLS or empty table
+          state = state.copyWith(
+            isSearching: false,
+            searchRadiusKm: 15,
+            searchingProgressMessage: 'Supabase returned 0 records (RLS default-deny active). Showing mock fallback.',
+            matches: MockHospitalData.standardCandidates,
+            hasSearched: true,
+            isRealBackend: true,
+            dataSourceLabel: repository.dataSourceName,
+            isRlsBlocked: true,
+            errorMessage: 'Supabase RLS is enabled with 0 policies on public.hospitals (default deny). Approval of a safe client SELECT policy is required to read live data directly from Flutter.',
+          );
+          return;
+        }
+      } on HospitalRepositoryException catch (e) {
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: 15,
+          searchingProgressMessage: e.isRlsBlock
+              ? 'Supabase RLS default-deny active. Falling back to mock dataset.'
+              : 'Database query failed. Falling back to mock dataset.',
+          matches: MockHospitalData.standardCandidates,
+          hasSearched: true,
+          isRealBackend: true,
+          dataSourceLabel: repository.dataSourceName,
+          isRlsBlocked: e.isRlsBlock,
+          errorMessage: e.message,
+        );
+        return;
+      } catch (e) {
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: 15,
+          searchingProgressMessage: 'Connection failed. Falling back to mock dataset.',
+          matches: MockHospitalData.standardCandidates,
+          hasSearched: true,
+          isRealBackend: false,
+          dataSourceLabel: 'MOCK_FIXTURE',
+          isRlsBlocked: false,
+          errorMessage: e.toString(),
+        );
+        return;
+      }
     }
 
     // Resolve candidates based on active fixture
@@ -220,6 +333,8 @@ class MatchingNotifier extends Notifier<MatchingState> {
       searchingProgressMessage: '${resolved.length} candidates ranked by road ETA & capacity',
       matches: resolved,
       hasSearched: true,
+      isRealBackend: repository.isRealBackend,
+      dataSourceLabel: repository.dataSourceName,
     );
   }
 
@@ -232,12 +347,16 @@ class MatchingNotifier extends Notifier<MatchingState> {
                 ? MockHospitalData.singleCandidate
                 : MockHospitalData.standardCandidates);
 
+    final repository = ref.read(hospitalRepositoryProvider);
+
     state = state.copyWith(
       isSearching: false,
       searchRadiusKm: 15,
       searchingProgressMessage: '${resolved.length} candidates ranked by road ETA & capacity',
       matches: resolved,
       hasSearched: true,
+      isRealBackend: repository.isRealBackend,
+      dataSourceLabel: repository.dataSourceName,
     );
   }
 
@@ -253,7 +372,11 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
   /// Resets matching state to initial defaults.
   void reset() {
-    state = MatchingState.initial();
+    final repository = ref.read(hospitalRepositoryProvider);
+    state = MatchingState.initial(
+      isRealBackend: repository.isRealBackend,
+      dataSourceLabel: repository.dataSourceName,
+    );
   }
 }
 

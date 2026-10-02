@@ -39,3 +39,14 @@ class NetworkException extends AppException {
     super.cause,
   }) : super(message: message);
 }
+
+class HospitalRepositoryException extends AppException {
+  const HospitalRepositoryException(
+    String message, {
+    super.code = ErrorCodes.repositoryError,
+    this.isRlsBlock = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isRlsBlock;
+}

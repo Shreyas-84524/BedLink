@@ -7,6 +7,7 @@ import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/badges/bedlink_badge.dart';
 import '../../../../shared/widgets/buttons/bedlink_button.dart';
 import '../../../../shared/widgets/cards/bedlink_card.dart';
+import '../../../../shared/widgets/inputs/bedlink_validation_message.dart';
 import '../../domain/models/hospital_match.dart';
 import '../providers/matching_provider.dart';
 import '../providers/selected_hospital_provider.dart';
@@ -81,6 +82,30 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
               // Fixture & Filter Switcher Bar (Demo & Verification)
               _buildFilterAndFixtureBar(matchingState, matchingNotifier),
               const SizedBox(height: 12),
+
+              if (matchingState.isRlsBlocked) ...[
+                const BedLinkValidationMessage(
+                  message:
+                      'SUPABASE CONNECTED (RLS DEFAULT-DENY ACTIVE) • Live reads require client SELECT policy approval. Showing cached seed directory.',
+                  severity: ValidationSeverity.warning,
+                ),
+                const SizedBox(height: 12),
+              ] else if (matchingState.isRealBackend) ...[
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    BedLinkBadge(
+                      label:
+                          'DATA SOURCE: SUPABASE CLOUD (${matchingState.matches.length} HOSPITALS)',
+                      backgroundColor: AppColors.tealSurface,
+                      textColor: AppColors.tealDark,
+                      borderColor: AppColors.tealBorder,
+                      isMonospaced: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // Content: Results or Empty State
               if (matchingState.matches.isEmpty)
