@@ -31,7 +31,7 @@ class BedLinkMetricCard extends StatelessWidget {
     return BedLinkCard(
       variant: variant,
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -40,39 +40,43 @@ class BedLinkMetricCard extends StatelessWidget {
             children: [
               if (icon != null) ...[
                 Icon(icon, size: 14, color: AppColors.textSecondary),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
               Expanded(
                 child: Text(
                   label.toUpperCase(),
-                  style: AppTypography.operationalLabel,
+                  style: AppTypography.operationalLabel.copyWith(fontSize: 10),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: AppTypography.operationalValue.copyWith(
-                  color: valueColor ?? AppColors.textPrimary,
-                ),
-              ),
-              if (unit != null) ...[
-                const SizedBox(width: 4),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
                 Text(
-                  unit!,
-                  style: AppTypography.operationalValueSm.copyWith(
-                    color: AppColors.textSecondary,
+                  value,
+                  style: AppTypography.operationalValue.copyWith(
+                    color: valueColor ?? AppColors.textPrimary,
                   ),
                 ),
+                if (unit != null) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    unit!,
+                    style: AppTypography.operationalValueSm.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
           if (subtext != null) ...[
             const SizedBox(height: 4),

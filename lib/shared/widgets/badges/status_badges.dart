@@ -88,11 +88,13 @@ class AvailabilityBadge extends StatelessWidget {
   const AvailabilityBadge({
     required this.state,
     this.count,
+    this.customLabel,
     super.key,
   });
 
   final AvailabilityState state;
   final int? count;
+  final String? customLabel;
 
   factory AvailabilityBadge.fromCount(int count, {Key? key}) {
     final state = AvailabilityState.fromCount(count);
@@ -105,9 +107,10 @@ class AvailabilityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String label = count != null
-        ? (count! > 0 ? '$count AVAILABLE' : '0 BEDS • DIVERT')
-        : state.label;
+    final String label = customLabel ??
+        (count != null
+            ? (count! > 0 ? '$count AVAILABLE' : '0 BEDS • DIVERT')
+            : state.label);
 
     return BedLinkBadge.fromSemantic(
       label: label,

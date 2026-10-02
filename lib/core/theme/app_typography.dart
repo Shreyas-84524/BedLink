@@ -136,6 +136,24 @@ class AppTypography {
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
+  static const TextStyle operationalData = TextStyle(
+    fontFamily: monoFontFamily,
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    height: 1.2,
+    color: AppColors.textPrimary,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  static const TextStyle operationalDataBold = TextStyle(
+    fontFamily: monoFontFamily,
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    height: 1.2,
+    color: AppColors.textPrimary,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
   static const TextStyle badge = TextStyle(
     fontFamily: primaryFontFamily,
     fontSize: 11,

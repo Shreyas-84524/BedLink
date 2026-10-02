@@ -75,6 +75,29 @@ class BedLinkCard extends StatelessWidget {
         break;
     }
 
+    final Widget contentBody = leftAccentColor == null
+        ? Padding(
+            padding: padding,
+            child: child,
+          )
+        : IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 4.0,
+                  color: leftAccentColor,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: padding,
+                    child: child,
+                  ),
+                ),
+              ],
+            ),
+          );
+
     final cardContent = Container(
       margin: margin,
       clipBehavior: Clip.antiAlias,
@@ -83,24 +106,7 @@ class BedLinkCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: borderColor, width: borderWidth),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (leftAccentColor != null)
-              Container(
-                width: 4.0,
-                color: leftAccentColor,
-              ),
-            Expanded(
-              child: Padding(
-                padding: padding,
-                child: child,
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: contentBody,
     );
 
     if (onTap != null) {

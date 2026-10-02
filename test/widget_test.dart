@@ -11,8 +11,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('BedLink'), findsOneWidget);
-    expect(find.text('Right bed. Right hospital. Right now.'), findsOneWidget);
-    expect(find.text('Enter Application'), findsOneWidget);
+    expect(find.text('BedLink'), findsWidgets);
+    expect(find.text('EMERGENCY HOSPITAL ALLOCATION'), findsOneWidget);
+    expect(find.text('PROCEED TO LOGIN'), findsOneWidget);
   });
 }

@@ -14,31 +14,37 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 2 (BedLink Design System)
-- **Current Sub-Phase:** 2.8 completed (Interactive Showcase & Component Verification)
+- **Current Phase:** Phase 3 (Application Shell, Authentication UI & Role Navigation)
+- **Current Sub-Phase:** 3.8 completed (Comprehensive Auth Flow & Role Navigation Verification)
 - **Completed work:**
-  - Phase 1 approved and finalized (`chore(phase-1): approve flutter foundation`).
-  - Sub-phase 2.1: Semantic Color Tokens & Theme Configuration (`lib/core/theme/app_colors.dart`, `semantic_tokens.dart`, `app_theme.dart`).
-  - Sub-phase 2.2: Typography System & Numeric Readouts (`lib/core/theme/app_typography.dart` with Chivo sans-serif & JetBrains Mono tabular figures).
-  - Sub-phase 2.3: Action Components & CTA System (`lib/shared/widgets/buttons/bedlink_button.dart`, `bedlink_icon_button.dart`).
-  - Sub-phase 2.4: Card Hierarchy & Clinical Surfaces (`lib/shared/widgets/cards/bedlink_card.dart`, `bedlink_metric_card.dart`).
-  - Sub-phase 2.5: Status Badges, Indicators & Semantic Chips (`lib/shared/widgets/badges/bedlink_badge.dart`, `status_badges.dart`).
-  - Sub-phase 2.6: Form Controls, Steppers & Clinical Inputs (`lib/shared/widgets/inputs/` text field, search field, segmented selector, counter control, option card, chips, validation messages).
-  - Sub-phase 2.7: Application Chrome, App Bars & Persistent Badges (`lib/shared/widgets/chrome/` logo, live indicator badge, app bar).
-  - Sub-phase 2.8: Interactive Design System Showcase & Validation (`lib/features/design_system/` catalog route `/design-system`, responsive layout tests).
-  - `PHASE_2_REPORT.md` generated.
+  - Phase 1 & Phase 2 approved and finalized (`chore(phase-1): approve flutter foundation`, `chore(phase-2): approve bedlink design system`).
+  - Sub-phase 3.1: Application Splash Screen & Initialization Flow (`lib/features/auth/presentation/screens/splash_screen.dart`).
+  - Sub-phase 3.2: Role-Based Authentication Screen (`lib/features/auth/presentation/screens/login_screen.dart` with dual role selector and 10-digit ID/password validation).
+  - Sub-phase 3.3: Mock Authentication Repository & Account Fixtures (`lib/features/auth/domain/repositories/auth_repository.dart`, `lib/features/auth/data/repositories/mock_auth_repository.dart`, `lib/features/auth/domain/models/auth_credentials.dart`).
+  - Sub-phase 3.4: Ambulance Application Shell & Navigation Structure (`lib/features/ambulance/presentation/screens/ambulance_dashboard_screen.dart`, sequential workflow cards for Phases 4–9).
+  - Sub-phase 3.5: Hospital Application Shell & Operational Sections (`lib/features/hospital/presentation/screens/hospital_dashboard_screen.dart`, live capacity snapshot & Phase 8 operational module hubs).
+  - Sub-phase 3.6: Declarative Route Configuration & Role Guards (`lib/app/router.dart` with `_GoRouterRefreshNotifier` linked to `sessionProvider`, role-based redirect protection).
+  - Sub-phase 3.7: Session State Management & Auth Exceptions (`lib/shared/providers/session_provider.dart`, `lib/shared/widgets/errors/access_denied_screen.dart`, `lib/shared/widgets/errors/not_found_screen.dart`).
+  - Sub-phase 3.8: Comprehensive Auth Flow & Role Navigation Verification (`test/app/router_test.dart`, `test/features/auth/auth_flow_test.dart`, `test/features/ambulance/ambulance_shell_test.dart`, `test/features/hospital/hospital_shell_test.dart`).
+  - `PHASE_3_REPORT.md` generated.
 
 ## Verification results
 - `flutter analyze`: 0 issues found (strict mode enabled).
-- `flutter test`: 46/46 tests passed across 9 test suites.
-- `flutter build web`: Built cleanly to `build/web`.
+- `flutter test`: 59/59 tests passed across 12 test suites.
+- `flutter build web`: Built cleanly to `build/web` (115.9s).
+- Compact viewport validation: 320dp width verified without RenderFlex overflow.
 
 ## Current files
 - `lib/core/theme/*`
-- `lib/shared/widgets/badges/*`, `lib/shared/widgets/buttons/*`, `lib/shared/widgets/cards/*`, `lib/shared/widgets/chrome/*`, `lib/shared/widgets/inputs/*`, `lib/shared/widgets/app_scaffold.dart`
+- `lib/shared/models/*`, `lib/shared/providers/*`, `lib/shared/widgets/*`
+- `lib/features/auth/*`
+- `lib/features/ambulance/*`
+- `lib/features/hospital/*`
+- `lib/features/matching/*`, `lib/features/reservation/*`, `lib/features/navigation/*` (scaffolded shells)
 - `lib/features/design_system/*`
-- `test/core/theme_test.dart`, `test/shared/buttons_test.dart`, `test/shared/cards_test.dart`, `test/shared/badges_test.dart`, `test/shared/inputs_test.dart`, `test/features/design_system/design_system_screen_test.dart`
-- `PHASE_2_REPORT.md`
+- `lib/app/router.dart`, `lib/app/app.dart`, `lib/main.dart`
+- `test/app/*`, `test/features/*`, `test/shared/*`, `test/core/*`
+- `PHASE_3_REPORT.md`
 
 ## Next recommended task
-Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-2): approve bedlink design system`, then proceed to Phase 3 (Authentication & Navigation Shell).
+Await manual testing and explicit user approval (`APPROVED`) to create `chore(phase-3): approve authentication and role navigation`, then proceed to Phase 4 (Ambulance Patient Intake & Clinical Triage UI).
