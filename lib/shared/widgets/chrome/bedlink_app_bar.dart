@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../providers/session_provider.dart';
+import '../demo/dev_fixture_center.dart';
 import 'bedlink_logo.dart';
 import 'med_net_live_badge.dart';
 
@@ -142,6 +143,11 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ],
         ...?actions,
+        IconButton(
+          icon: const Icon(Icons.tune_rounded, size: 20, color: AppColors.secondaryTeal),
+          tooltip: 'Dev Fixture Center (Phase 10)',
+          onPressed: () => DevFixtureCenter.show(context),
+        ),
         IconButton(
           icon: const Icon(Icons.logout_outlined, size: 20, color: AppColors.textSecondary),
           tooltip: 'Sign Out / Switch Role',
