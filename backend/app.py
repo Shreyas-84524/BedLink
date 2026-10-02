@@ -150,6 +150,49 @@ def match_hospitals():
             "status": "error",
             "message": str(e)
         }), 500
-        
+
+@app.route("/ambulance-requests", methods=["POST"])
+def create_ambulance_request():
+    data = request.get_json(silent=True) or {}
+
+    required = ["ambulance_id", "bed_type", "latitude", "longitude"]
+
+    if any(field not in data for field in required):
+        return jsonify({
+            "status": "error",
+            "message": "Missing required fields"
+        }), 400
+
+    try:
+        request_data = {
+            "ambulance_id": data["ambulance_id"],
+            "bed_type": data["bed_type"],
+            "latitude": data["latitude"],
+            "longitude": data["longitude"],
+            "required_facilities": data.get(
+                "required_facilities", []
+            ),
+            "status": "pending"
+        }
+
+        result = (
+            supabase.table("ambulance_requests")
+            .insert(request_data)
+            .execute()
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": "Ambulance request created!",
+            "request": result.data[0]
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
