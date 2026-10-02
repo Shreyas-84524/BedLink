@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/semantic_tokens.dart';
 import '../../../ambulance/domain/models/clinical_urgency.dart';
+import '../../data/adapters/bed_inventory_adapter.dart';
 import '../../domain/models/hospital_hold_item.dart';
 import '../../domain/models/hospital_request_item.dart';
 import '../../domain/models/hospital_resource_item.dart';
+import 'bed_repository_provider.dart';
 
 /// Complete in-memory operational state of the hospital triage desk and bed inventory.
 class HospitalOperationalState {
@@ -17,6 +21,8 @@ class HospitalOperationalState {
     required this.activeHolds,
     required this.updatedAt,
     required this.lastConfirmedAt,
+    this.dataSourceName = 'MOCK_FIXTURE',
+    this.isRealBackend = false,
   });
 
   final String hospitalId;
@@ -28,6 +34,8 @@ class HospitalOperationalState {
   final List<HospitalActiveHold> activeHolds;
   final DateTime updatedAt;
   final DateTime lastConfirmedAt;
+  final String dataSourceName;
+  final bool isRealBackend;
 
   /// Count of incoming offers awaiting review.
   int get pendingRequestCount =>
@@ -82,6 +90,8 @@ class HospitalOperationalState {
     List<HospitalActiveHold>? activeHolds,
     DateTime? updatedAt,
     DateTime? lastConfirmedAt,
+    String? dataSourceName,
+    bool? isRealBackend,
   }) {
     return HospitalOperationalState(
       hospitalId: hospitalId ?? this.hospitalId,
@@ -93,6 +103,8 @@ class HospitalOperationalState {
       activeHolds: activeHolds ?? this.activeHolds,
       updatedAt: updatedAt ?? this.updatedAt,
       lastConfirmedAt: lastConfirmedAt ?? this.lastConfirmedAt,
+      dataSourceName: dataSourceName ?? this.dataSourceName,
+      isRealBackend: isRealBackend ?? this.isRealBackend,
     );
   }
 
@@ -218,9 +230,62 @@ class HospitalOperationalState {
 
 /// Riverpod Notifier providing fast hospital availability controls, request triage, and active holds.
 class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
+  bool _isLoadingInventory = false;
+  String? _inventoryError;
+  bool _isRlsBlocked = false;
+
+  bool get isLoadingInventory => _isLoadingInventory;
+  String? get inventoryError => _inventoryError;
+  bool get isRlsBlocked => _isRlsBlocked;
+
   @override
   HospitalOperationalState build() {
     return HospitalOperationalState.initial();
+  }
+
+  /// Loads live bed inventory from the active BedRepository and aggregates into resource pools.
+  Future<void> loadLiveBeds({String? hospitalId}) async {
+    _isLoadingInventory = true;
+    _inventoryError = null;
+    _isRlsBlocked = false;
+
+    try {
+      final repo = ref.read(bedRepositoryProvider);
+      final targetId = hospitalId ?? state.hospitalId;
+
+      final beds = await repo.getBedsForHospital(targetId);
+
+      const adapter = BedInventoryAdapter();
+      final result = adapter.aggregateBeds(beds, baselineResources: state.resources);
+
+      if (result.hasBackendRecords) {
+        state = state.copyWith(
+          resources: result.resources,
+          updatedAt: result.lastUpdatedAt ?? DateTime.now(),
+          dataSourceName: repo.dataSourceName,
+          isRealBackend: repo.isRealBackend,
+        );
+      } else {
+        state = state.copyWith(
+          dataSourceName: repo.dataSourceName,
+          isRealBackend: repo.isRealBackend,
+        );
+      }
+    } on BedRepositoryException catch (e) {
+      _inventoryError = e.message;
+      _isRlsBlocked = e.isRlsBlock;
+      debugPrint('BedRepositoryException in loadLiveBeds: ${e.message} (isRlsBlock: ${e.isRlsBlock})');
+    } catch (e, stack) {
+      _inventoryError = e.toString();
+      debugPrint('Unexpected error in loadLiveBeds: $e\n$stack');
+    } finally {
+      _isLoadingInventory = false;
+    }
+  }
+
+  /// Refreshes the bed inventory for the current hospital.
+  Future<void> refreshBedInventory() async {
+    await loadLiveBeds(hospitalId: state.hospitalId);
   }
 
   /// Increments the available count for a countable resource without exceeding capacity.

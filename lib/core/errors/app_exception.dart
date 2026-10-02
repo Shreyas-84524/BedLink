@@ -50,3 +50,15 @@ class HospitalRepositoryException extends AppException {
 
   final bool isRlsBlock;
 }
+
+class BedRepositoryException extends AppException {
+  const BedRepositoryException(
+    String message, {
+    super.code = ErrorCodes.repositoryError,
+    this.isRlsBlock = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isRlsBlock;
+}
+
