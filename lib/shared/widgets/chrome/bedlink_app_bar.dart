@@ -14,6 +14,7 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
     this.subtitle,
     this.showLiveBadge = true,
     this.showBackButton = true,
+    this.leading,
     this.actions,
     super.key,
   });
@@ -22,6 +23,7 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String? subtitle;
   final bool showLiveBadge;
   final bool showBackButton;
+  final Widget? leading;
   final List<Widget>? actions;
 
   @override
@@ -48,7 +50,10 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (canPop) ...[
+          if (leading != null) ...[
+            leading!,
+            const SizedBox(width: 8),
+          ] else if (canPop) ...[
             InkWell(
               onTap: () => context.pop(),
               borderRadius: BorderRadius.circular(6),
@@ -83,7 +88,7 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
             const SizedBox(width: 8),
           ],
           if (title != null) ...[
-            Expanded(
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,

@@ -321,9 +321,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           children: [
                             Icon(Icons.lock_rounded, size: 12, color: AppColors.textMuted),
                             SizedBox(width: 4),
-                            Text(
-                              'MED-NET SECURE DISPATCH PROTOCOL • 256-BIT TLS',
-                              style: AppTypography.operationalLabel,
+                            Flexible(
+                              child: Text(
+                                'MED-NET SECURE DISPATCH PROTOCOL • 256-BIT TLS',
+                                style: AppTypography.operationalLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
