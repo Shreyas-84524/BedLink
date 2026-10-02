@@ -205,6 +205,8 @@ class SupabaseHospitalDto {
       name: name,
       address: address,
       area: areaLabel,
+      latitude: latitude,
+      longitude: longitude,
       distanceKm: defaultDistanceKm,
       etaMinutes: defaultEtaMinutes,
       updatedMinutesAgo: 3,

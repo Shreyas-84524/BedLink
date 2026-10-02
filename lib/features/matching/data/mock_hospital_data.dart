@@ -38,6 +38,8 @@ class MockHospitalData {
     },
     routeSummary: 'via Dr. Ambedkar Rd & Acharya Donde Marg (Fastest route)',
     emergencyPhone: '+91 22 2410 7000',
+    latitude: 18.9986,
+    longitude: 72.8427,
     scoreBreakdown: MatchScoreBreakdown(
       clinicalFitScore: 39.5,
       travelTimeScore: 29.0,
@@ -77,6 +79,8 @@ class MockHospitalData {
     },
     routeSummary: 'via Lady Jamshedjee Rd & Cadell Rd',
     emergencyPhone: '+91 22 2445 2222',
+    latitude: 19.0330,
+    longitude: 72.8384,
     scoreBreakdown: MatchScoreBreakdown(
       clinicalFitScore: 37.0,
       travelTimeScore: 24.5,
@@ -116,6 +120,8 @@ class MockHospitalData {
     },
     routeSummary: 'via Western Express Hwy & Reclamation Flyover',
     emergencyPhone: '+91 22 2675 1000',
+    latitude: 19.0514,
+    longitude: 72.8295,
     scoreBreakdown: MatchScoreBreakdown(
       clinicalFitScore: 32.0,
       travelTimeScore: 20.0,
@@ -155,6 +161,8 @@ class MockHospitalData {
     },
     routeSummary: 'via Sion Flyover & Eastern Express Hwy (Heavy traffic)',
     emergencyPhone: '+91 22 2407 6381',
+    latitude: 19.0360,
+    longitude: 72.8601,
     scoreBreakdown: MatchScoreBreakdown(
       clinicalFitScore: 28.0,
       travelTimeScore: 16.0,
@@ -193,6 +201,8 @@ class MockHospitalData {
     },
     routeSummary: 'via Dr. E Borges Rd',
     emergencyPhone: '+91 22 2417 7000',
+    latitude: 19.0048,
+    longitude: 72.8436,
     scoreBreakdown: MatchScoreBreakdown(
       clinicalFitScore: 10.0,
       travelTimeScore: 13.0,

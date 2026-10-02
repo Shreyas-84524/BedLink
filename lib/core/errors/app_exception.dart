@@ -62,3 +62,18 @@ class BedRepositoryException extends AppException {
   final bool isRlsBlock;
 }
 
+class LocationException extends AppException {
+  const LocationException(
+    String message, {
+    super.code = ErrorCodes.noLocation,
+    this.isServiceDisabled = false,
+    this.isPermissionDenied = false,
+    this.isPermanentlyDenied = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isServiceDisabled;
+  final bool isPermissionDenied;
+  final bool isPermanentlyDenied;
+}
+

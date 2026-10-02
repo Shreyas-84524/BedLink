@@ -93,6 +93,7 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
               ] else if (matchingState.isRealBackend) ...[
                 Wrap(
                   spacing: 6,
+                  runSpacing: 6,
                   children: [
                     BedLinkBadge(
                       label:
@@ -102,8 +103,26 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
                       borderColor: AppColors.tealBorder,
                       isMonospaced: true,
                     ),
+                    if (matchingState.ambulanceLatitude != null &&
+                        matchingState.ambulanceLongitude != null)
+                      BedLinkBadge(
+                        label:
+                            'GPS: ${matchingState.ambulanceLatitude!.toStringAsFixed(4)}, ${matchingState.ambulanceLongitude!.toStringAsFixed(4)} (${matchingState.searchRadiusKm}KM RADIUS)',
+                        backgroundColor: AppColors.surfaceSubtle,
+                        textColor: AppColors.textPrimary,
+                        borderColor: AppColors.borderSubtle,
+                        isMonospaced: true,
+                      ),
                   ],
                 ),
+                if (matchingState.unsupportedRequirements.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  BedLinkValidationMessage(
+                    message:
+                        'NOTE: Backend inventory does not track live status for: ${matchingState.unsupportedRequirements.join(", ")}. Marked as unverified.',
+                    severity: ValidationSeverity.info,
+                  ),
+                ],
                 const SizedBox(height: 12),
               ],
 
