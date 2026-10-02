@@ -61,10 +61,13 @@ class BedLinkBadge extends StatelessWidget {
             ),
             const SizedBox(width: 5),
           ],
-          Text(
-            label.toUpperCase(),
-            style: (isMonospaced ? AppTypography.operationalValueSm : AppTypography.badge)
-                .copyWith(color: textColor),
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              style: (isMonospaced ? AppTypography.operationalValueSm : AppTypography.badge)
+                  .copyWith(color: textColor),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
