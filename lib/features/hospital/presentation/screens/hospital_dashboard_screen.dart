@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/semantic_tokens.dart';
 import '../../../../shared/providers/session_provider.dart';
 import '../../../../shared/widgets/badges/bedlink_badge.dart';
 import '../../../../shared/widgets/badges/status_badges.dart';
@@ -12,6 +11,7 @@ import '../../../../shared/widgets/buttons/bedlink_icon_button.dart';
 import '../../../../shared/widgets/cards/bedlink_card.dart';
 import '../../../../shared/widgets/cards/bedlink_metric_card.dart';
 import '../../../../shared/widgets/chrome/bedlink_app_bar.dart';
+import '../providers/hospital_state_provider.dart';
 
 /// Hospital Staff Application Shell & Operational Triage Center Screen.
 class HospitalDashboardScreen extends ConsumerWidget {
@@ -20,8 +20,14 @@ class HospitalDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final hospitalName = session.organizationName ?? 'KEM Hospital Mumbai';
-    final staffName = session.displayName ?? 'Dr. A. Mehta (Triage Lead)';
+    final hospitalState = ref.watch(hospitalStateProvider);
+
+    final hospitalName = session.organizationName ?? hospitalState.hospitalName;
+    final staffName = session.displayName ?? hospitalState.staffName;
+
+    final icuAvail = hospitalState.resources['icu_bed']?.available ?? 0;
+    final oxygenAvail = hospitalState.resources['oxygen_bed']?.available ?? 0;
+    final erAvail = hospitalState.resources['er_bed']?.available ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -81,23 +87,67 @@ class HospitalDashboardScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const HospitalLoadBadge(
-                        state: HospitalLoadState.low,
+                      HospitalLoadBadge(
+                        state: hospitalState.loadState,
                       ),
                     ],
                   ),
                   const Divider(height: 16, color: AppColors.border),
                   Wrap(
-                    spacing: 12,
+                    spacing: 8,
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      const FreshnessBadge(state: FreshnessState.fresh),
-                      Text(
-                        'CAMPUS: PAREL • ZONE 2',
-                        style: AppTypography.operationalLabel.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 10,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FreshnessBadge(state: hospitalState.overallFreshnessState),
+                          const SizedBox(width: 6),
+                          Text(
+                            hospitalState.minutesSinceLastConfirmed <= 0
+                                ? 'JUST NOW'
+                                : '${hospitalState.minutesSinceLastConfirmed}M AGO',
+                            style: AppTypography.operationalLabel.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () {
+                          ref.read(hospitalStateProvider.notifier).confirmNoChange();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Bed inventory confirmed with no changes. Freshness updated.'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.tealSurface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.tealBorder),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.tealDark),
+                              const SizedBox(width: 4),
+                              Text(
+                                'CONFIRM NO CHANGE',
+                                style: AppTypography.caption.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.tealDark,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -110,30 +160,30 @@ class HospitalDashboardScreen extends ConsumerWidget {
             // Live Capacity Summary Strip
             const Text('LIVE EMERGENCY CAPACITY SNAPSHOT', style: AppTypography.operationalLabel),
             const SizedBox(height: 8),
-            const Row(
+            Row(
               children: [
                 Expanded(
                   child: BedLinkMetricCard(
                     label: 'ICU BEDS',
-                    value: '04',
+                    value: icuAvail.toString().padLeft(2, '0'),
                     unit: 'AVAIL',
                     icon: Icons.monitor_heart_outlined,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: BedLinkMetricCard(
                     label: 'O2 BEDS',
-                    value: '12',
+                    value: oxygenAvail.toString().padLeft(2, '0'),
                     unit: 'AVAIL',
                     icon: Icons.air_outlined,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: BedLinkMetricCard(
                     label: 'TRAUMA',
-                    value: '02',
+                    value: erAvail.toString().padLeft(2, '0'),
                     unit: 'AVAIL',
                     icon: Icons.emergency_outlined,
                   ),
@@ -152,7 +202,7 @@ class HospitalDashboardScreen extends ConsumerWidget {
               subtitle: 'Update ICU, Oxygen, and Trauma bed counts with quick ± counters.',
               route: '/hospital/resources',
               icon: Icons.inventory_2_outlined,
-              badgeText: 'PHASE 8',
+              badgeLabel: '${(hospitalState.totalOccupancyRate * 100).toInt()}% OCCUPIED',
               accentColor: AppColors.secondaryTeal,
             ),
             const SizedBox(height: 8),
@@ -163,7 +213,12 @@ class HospitalDashboardScreen extends ConsumerWidget {
               subtitle: 'Review incoming 2-minute candidate offers and accept/decline triage calls.',
               route: '/hospital/requests',
               icon: Icons.notifications_active_outlined,
-              badgeText: 'PHASE 8',
+              badgeLabel: hospitalState.pendingRequestCount > 0
+                  ? '${hospitalState.pendingRequestCount} PENDING'
+                  : 'NONE PENDING',
+              badgeBg: hospitalState.pendingRequestCount > 0 ? AppColors.warningSurface : AppColors.surfaceSubtle,
+              badgeTextColor: hospitalState.pendingRequestCount > 0 ? AppColors.warningDark : AppColors.textPrimary,
+              badgeBorder: hospitalState.pendingRequestCount > 0 ? AppColors.warningBorder : AppColors.border,
               accentColor: AppColors.warningAmber,
             ),
             const SizedBox(height: 8),
@@ -174,7 +229,12 @@ class HospitalDashboardScreen extends ConsumerWidget {
               subtitle: 'Monitor accepted bed holds, live ambulance ETAs, and prepare trauma bays.',
               route: '/hospital/holds',
               icon: Icons.bookmark_added_outlined,
-              badgeText: 'PHASE 8',
+              badgeLabel: hospitalState.activeHoldCount > 0
+                  ? '${hospitalState.activeHoldCount} INBOUND'
+                  : '0 ACTIVE',
+              badgeBg: hospitalState.activeHoldCount > 0 ? AppColors.tealSurface : AppColors.surfaceSubtle,
+              badgeTextColor: hospitalState.activeHoldCount > 0 ? AppColors.tealDark : AppColors.textPrimary,
+              badgeBorder: hospitalState.activeHoldCount > 0 ? AppColors.tealBorder : AppColors.border,
               accentColor: AppColors.infoBlue,
             ),
             const SizedBox(height: 16),
@@ -208,7 +268,10 @@ class HospitalDashboardScreen extends ConsumerWidget {
     required String subtitle,
     required String route,
     required IconData icon,
-    required String badgeText,
+    required String badgeLabel,
+    Color badgeBg = AppColors.surfaceSubtle,
+    Color badgeTextColor = AppColors.textPrimary,
+    Color badgeBorder = AppColors.border,
     required Color accentColor,
   }) {
     return BedLinkCard(
@@ -246,7 +309,10 @@ class HospitalDashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 6),
                     BedLinkBadge(
-                      label: badgeText,
+                      label: badgeLabel,
+                      backgroundColor: badgeBg,
+                      textColor: badgeTextColor,
+                      borderColor: badgeBorder,
                     ),
                   ],
                 ),
