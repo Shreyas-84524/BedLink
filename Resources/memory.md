@@ -14,8 +14,8 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 9 — Navigation, En Route & Arrival Frontend (Implemented & Validated)
-- **Current Sub-Phase:** Phase 9 complete & verified; ready for Phase 9 approval.
+- **Current Phase:** Phase 9 — Navigation, En Route & Arrival Frontend (Approved)
+- **Current Sub-Phase:** Phase 9 complete & approved; ready for Phase 10 (Offline & Resilience Frontend).
 - **Completed work:**
   - Phases 1 through 8 completed, verified, and approved in Git history.
   - Phase 9 Navigation, En Route & Arrival Frontend fully implemented & verified:
@@ -50,4 +50,4 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - `PHASE_1_REPORT.md` through `PHASE_9_REPORT.md`
 
 ## Next recommended task
-Create implementation commit `feat(phase-9): complete navigation and arrival frontend`, await user manual review and approval commit `chore(phase-9): approve navigation and arrival frontend`, then proceed to Phase 10 upon user instruction.
+Proceed to Phase 10 — Offline & Resilience Frontend upon user instruction.
