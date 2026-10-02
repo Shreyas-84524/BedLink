@@ -14,10 +14,10 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
 
 ## Current status
-- **Current Phase:** Phase 6 — Hospital Discovery & Match Grid Frontend
-- **Current Sub-Phase:** 6.8 completed (Verification, Edge Cases & Riverpod Integration)
+- **Current Phase:** Phase 6 — Hospital Discovery & Match Grid Frontend (Approved)
+- **Current Sub-Phase:** Phase 6 complete & approved; ready for Phase 7 (Two-Minute Hold & Confirmation Frontend).
 - **Completed work:**
-  - Phases 1, 2, 3, 4 & 5 completed, verified, and approved.
+  - Phases 1, 2, 3, 4, 5 & 6 completed, verified, and approved.
   - Sub-phase 6.1: Matching/Searching State Telemetry (`lib/features/matching/presentation/widgets/matching_search_indicator.dart` with animated radar sweep, 5km -> 10km -> 15km progression).
   - Sub-phase 6.2: Patient Requirement Summary Bar (`lib/features/matching/presentation/widgets/patient_requirement_summary_bar.dart` consuming `patientIntakeProvider` and `bedRequirementProvider`).
   - Sub-phase 6.3: Primary Hospital Result Card (`lib/features/matching/presentation/widgets/primary_hospital_card.dart` for #1 KEM Hospital with road ETA, distance, capacity, route preview, and hold CTA).
@@ -47,4 +47,4 @@ Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interface
 - `PHASE_1_REPORT.md`, `PHASE_2_REPORT.md`, `PHASE_3_REPORT.md`, `PHASE_4_REPORT.md`, `PHASE_4_RECOVERY_AUDIT.md`, `PHASE_5_REPORT.md`, `PHASE_6_REPORT.md`
 
 ## Next recommended task
-Await manual user review of Phase 6 and explicit approval (`APPROVED`). Upon approval, create approval commit `chore(phase-6): approve hospital discovery grid` and proceed to Phase 7 (Two-Minute Hold & Confirmation Frontend).
+Proceed to Phase 7 — Two-Minute Hold & Confirmation Frontend upon user instruction.
