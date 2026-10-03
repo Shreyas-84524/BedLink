@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/semantic_tokens.dart';
 import '../../../ambulance/domain/models/clinical_urgency.dart';
+import '../../../ambulance/domain/models/emergency_request.dart';
+import '../../../ambulance/presentation/providers/emergency_request_provider.dart';
 import '../../data/adapters/bed_inventory_adapter.dart';
 import '../../domain/models/hospital_hold_item.dart';
 import '../../domain/models/hospital_request_item.dart';
@@ -233,6 +236,7 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
   bool _isLoadingInventory = false;
   String? _inventoryError;
   bool _isRlsBlocked = false;
+  StreamSubscription<List<EmergencyRequest>>? _requestsSub;
 
   bool get isLoadingInventory => _isLoadingInventory;
   String? get inventoryError => _inventoryError;
@@ -240,7 +244,57 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
 
   @override
   HospitalOperationalState build() {
+    ref.onDispose(() {
+      _requestsSub?.cancel();
+    });
     return HospitalOperationalState.initial();
+  }
+
+  /// Maps an [EmergencyRequest] from Supabase to a [HospitalIncomingRequest] for triage.
+  HospitalIncomingRequest _toIncomingRequest(EmergencyRequest r) {
+    return HospitalIncomingRequest(
+      id: r.id,
+      ambulanceId: r.ambulanceId,
+      urgency: r.urgency,
+      patientDisplayName: r.patientName ?? 'Inbound Patient',
+      patientAge: r.patientAge ?? 45,
+      biologicalSex: 'M',
+      chiefComplaint: r.chiefComplaint ?? 'Emergency Transfer Request',
+      requiredResources: r.requiredResources.isNotEmpty ? r.requiredResources : {'icu_bed': 1},
+      requiredCapabilities: r.requiredCapabilities,
+      etaMinutes: 10,
+      remainingSeconds: r.expiresAt != null
+          ? r.expiresAt!.difference(DateTime.now()).inSeconds.clamp(0, 120)
+          : 120,
+      status: r.status.isReserved
+          ? HospitalRequestStatus.accepted
+          : (r.status.isCancelled ? HospitalRequestStatus.rejected : HospitalRequestStatus.pending),
+      receivedAt: r.createdAt,
+    );
+  }
+
+  /// Loads live emergency transfer requests dispatched to this hospital from Supabase.
+  Future<void> loadLiveRequests({String? hospitalId}) async {
+    final reqRepo = ref.read(emergencyRequestRepositoryProvider);
+    if (!reqRepo.isRealBackend) return;
+
+    final targetId = hospitalId ?? state.hospitalId;
+    try {
+      final raw = await reqRepo.getRequestsForHospital(targetId);
+      final mapped = raw.map(_toIncomingRequest).toList();
+      state = state.copyWith(
+        incomingRequests: mapped,
+        isRealBackend: true,
+      );
+
+      await _requestsSub?.cancel();
+      _requestsSub = reqRepo.watchHospitalRequests(targetId).listen((list) {
+        final updated = list.map(_toIncomingRequest).toList();
+        state = state.copyWith(incomingRequests: updated);
+      });
+    } catch (e) {
+      debugPrint('Error loading live hospital requests: $e');
+    }
   }
 
   /// Loads live bed inventory from the active BedRepository and aggregates into resource pools.
@@ -381,6 +435,21 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
       activeHolds: newHolds,
       updatedAt: DateTime.now(),
     );
+
+    // Sync with real backend if active
+    final reqRepo = ref.read(emergencyRequestRepositoryProvider);
+    final bedRepo = ref.read(bedMutationRepositoryProvider);
+    if (reqRepo.isRealBackend) {
+      unawaited(reqRepo.updateRequestStatus(
+        requestId,
+        EmergencyRequestStatus.reserved,
+        hospitalId: state.hospitalId,
+        hospitalName: state.hospitalName,
+      ));
+    }
+    if (bedRepo.isRealBackend) {
+      unawaited(bedRepo.reserveBed(state.hospitalId, 'icu_bed'));
+    }
   }
 
   /// Hospital triage desk declines the incoming emergency request.
@@ -401,6 +470,14 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
     state = state.copyWith(
       incomingRequests: newRequests,
     );
+
+    final reqRepo = ref.read(emergencyRequestRepositoryProvider);
+    if (reqRepo.isRealBackend) {
+      unawaited(reqRepo.updateRequestStatus(
+        requestId,
+        EmergencyRequestStatus.cancelled,
+      ));
+    }
   }
 
   /// Simulates 2-minute timer expiry on an incoming request.
@@ -451,6 +528,18 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
       resources: newResources,
       updatedAt: DateTime.now(),
     );
+
+    final reqRepo = ref.read(emergencyRequestRepositoryProvider);
+    final bedRepo = ref.read(bedMutationRepositoryProvider);
+    if (reqRepo.isRealBackend && hold.requestId.isNotEmpty) {
+      unawaited(reqRepo.updateRequestStatus(
+        hold.requestId,
+        EmergencyRequestStatus.completed,
+      ));
+    }
+    if (bedRepo.isRealBackend) {
+      unawaited(bedRepo.markBedOccupied(state.hospitalId, 'icu_bed'));
+    }
   }
 
   /// Releases an active hold and returns the held beds back to available.
@@ -484,6 +573,11 @@ class HospitalStateNotifier extends Notifier<HospitalOperationalState> {
       resources: newResources,
       updatedAt: DateTime.now(),
     );
+
+    final bedRepo = ref.read(bedMutationRepositoryProvider);
+    if (bedRepo.isRealBackend) {
+      unawaited(bedRepo.releaseReservedBed(state.hospitalId, 'icu_bed'));
+    }
   }
 
   /// Injects a new incoming emergency offer (useful for testing & demo).

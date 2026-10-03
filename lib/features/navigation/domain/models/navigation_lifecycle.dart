@@ -44,6 +44,10 @@ class NavigationProgressState {
     required this.routeProgress,
     required this.currentInstructionIndex,
     required this.instructions,
+    this.routeGeometry = const [],
+    this.isRealRouting = false,
+    this.routingError,
+    this.isRoutingLoading = false,
     this.startedAt,
     this.arrivedAt,
     this.completedAt,
@@ -55,6 +59,10 @@ class NavigationProgressState {
   final double routeProgress; // 0.0 .. 1.0
   final int currentInstructionIndex;
   final List<MockRouteInstruction> instructions;
+  final List<({double latitude, double longitude})> routeGeometry;
+  final bool isRealRouting;
+  final String? routingError;
+  final bool isRoutingLoading;
   final DateTime? startedAt;
   final DateTime? arrivedAt;
   final DateTime? completedAt;
@@ -112,6 +120,10 @@ class NavigationProgressState {
     double? routeProgress,
     int? currentInstructionIndex,
     List<MockRouteInstruction>? instructions,
+    List<({double latitude, double longitude})>? routeGeometry,
+    bool? isRealRouting,
+    String? routingError,
+    bool? isRoutingLoading,
     DateTime? startedAt,
     DateTime? arrivedAt,
     DateTime? completedAt,
@@ -123,6 +135,10 @@ class NavigationProgressState {
       routeProgress: routeProgress ?? this.routeProgress,
       currentInstructionIndex: currentInstructionIndex ?? this.currentInstructionIndex,
       instructions: instructions ?? this.instructions,
+      routeGeometry: routeGeometry ?? this.routeGeometry,
+      isRealRouting: isRealRouting ?? this.isRealRouting,
+      routingError: routingError ?? this.routingError,
+      isRoutingLoading: isRoutingLoading ?? this.isRoutingLoading,
       startedAt: startedAt ?? this.startedAt,
       arrivedAt: arrivedAt ?? this.arrivedAt,
       completedAt: completedAt ?? this.completedAt,
@@ -174,6 +190,9 @@ class NavigationProgressState {
   factory NavigationProgressState.initial({
     int initialEta = 8,
     double initialDistance = 3.8,
+    List<MockRouteInstruction>? initialInstructions,
+    List<({double latitude, double longitude})> routeGeometry = const [],
+    bool isRealRouting = false,
   }) {
     return NavigationProgressState(
       status: NavigationStatus.enRoute,
@@ -181,7 +200,9 @@ class NavigationProgressState {
       remainingDistanceKm: initialDistance,
       routeProgress: 0.05,
       currentInstructionIndex: 0,
-      instructions: defaultInstructions(),
+      instructions: initialInstructions ?? defaultInstructions(),
+      routeGeometry: routeGeometry,
+      isRealRouting: isRealRouting,
       startedAt: DateTime.now(),
     );
   }

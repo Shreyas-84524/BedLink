@@ -23,6 +23,21 @@ class SupabaseConfig {
     this.mode = AppMode.mock,
   });
 
+  /// Normalizes project URL by stripping any /rest/v1 or trailing slashes.
+  static String normalizeUrl(String raw) {
+    var trimmed = raw.trim();
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    if (trimmed.endsWith('/rest/v1')) {
+      trimmed = trimmed.substring(0, trimmed.length - '/rest/v1'.length);
+    }
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+
   /// Reads configuration from compile-time `--dart-define` environment.
   factory SupabaseConfig.fromEnvironment() {
     const envUrl = String.fromEnvironment('SUPABASE_URL');
@@ -42,8 +57,8 @@ class SupabaseConfig {
     }
 
     return SupabaseConfig(
-      url: envUrl,
-      anonKey: envAnonKey,
+      url: normalizeUrl(envUrl),
+      anonKey: envAnonKey.trim(),
       mode: resolvedMode,
     );
   }
@@ -64,8 +79,8 @@ class SupabaseConfig {
     AppMode mode = AppMode.supabase,
   }) {
     return SupabaseConfig(
-      url: url,
-      anonKey: anonKey,
+      url: normalizeUrl(url),
+      anonKey: anonKey.trim(),
       mode: mode,
     );
   }

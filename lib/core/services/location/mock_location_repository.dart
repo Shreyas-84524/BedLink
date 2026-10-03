@@ -77,4 +77,10 @@ class MockLocationRepository implements LocationRepository {
 
     return _currentLocation;
   }
+
+  @override
+  Future<bool> openAppSettings() async => true;
+
+  @override
+  Future<bool> openLocationSettings() async => true;
 }

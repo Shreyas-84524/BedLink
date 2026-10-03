@@ -77,3 +77,18 @@ class LocationException extends AppException {
   final bool isPermanentlyDenied;
 }
 
+class RoutingException extends AppException {
+  const RoutingException(
+    String message, {
+    super.code = ErrorCodes.networkError,
+    this.isRateLimited = false,
+    this.isAuthError = false,
+    this.isNoRoute = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isRateLimited;
+  final bool isAuthError;
+  final bool isNoRoute;
+}
+

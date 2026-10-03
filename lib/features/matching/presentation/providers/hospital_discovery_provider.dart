@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../hospital/presentation/providers/hospital_repository_provider.dart';
 import '../../data/repositories/mock_hospital_discovery_repository.dart';
 import '../../data/repositories/supabase_hospital_discovery_repository.dart';
+import '../../data/services/ors_matrix_service.dart';
 import '../../domain/repositories/hospital_discovery_repository.dart';
 
 /// Provider exposing the active [HospitalDiscoveryRepository].
@@ -11,8 +12,10 @@ final hospitalDiscoveryRepositoryProvider = Provider<HospitalDiscoveryRepository
   final hospitalRepo = ref.watch(hospitalRepositoryProvider);
 
   if (hospitalRepo.isRealBackend) {
+    final matrixService = ref.watch(orsMatrixServiceProvider);
     return SupabaseHospitalDiscoveryRepository(
       hospitalRepository: hospitalRepo,
+      matrixService: matrixService,
     );
   }
 

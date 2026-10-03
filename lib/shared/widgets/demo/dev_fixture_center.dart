@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/data/supabase_client_provider.dart';
+import '../../../core/services/location/location_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../providers/connectivity_provider.dart';
@@ -26,6 +28,11 @@ class DevFixtureCenter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(supabaseConfigProvider);
+    if (!config.useMock) {
+      return const SizedBox.shrink();
+    }
+
     final connectivity = ref.watch(connectivityProvider);
     final connNotifier = ref.read(connectivityProvider.notifier);
     final coordinator = ref.read(mockEmergencyCoordinatorProvider);
@@ -201,7 +208,97 @@ class DevFixtureCenter extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // Section 4: System Reset
+            // Section 4: Location & GPS Diagnostics (Phase 13)
+            _buildSectionHeader(Icons.my_location_rounded, 'LOCATION & GPS DIAGNOSTICS'),
+            const SizedBox(height: 8),
+            Consumer(
+              builder: (context, ref, _) {
+                final locationRepo = ref.watch(locationRepositoryProvider);
+                final locState = ref.watch(ambulanceLocationProvider);
+
+                return BedLinkCard(
+                  variant: BedLinkCardVariant.muted,
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          const Text('Location Source:', style: AppTypography.caption),
+                          BedLinkBadge(
+                            label: locationRepo.isHardwareGps ? 'REAL GPS' : 'MOCK FIXTURE',
+                            backgroundColor: locationRepo.isHardwareGps
+                                ? AppColors.tealSurface
+                                : AppColors.surfaceSubtle,
+                            textColor: locationRepo.isHardwareGps
+                                ? AppColors.tealDark
+                                : AppColors.textSecondary,
+                            borderColor: locationRepo.isHardwareGps
+                                ? AppColors.tealBorder
+                                : AppColors.border,
+                            isMonospaced: true,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          const Text('Status:', style: AppTypography.caption),
+                          Text(
+                            locState.status.name.toUpperCase(),
+                            style: AppTypography.caption.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          const Text('Coordinates:', style: AppTypography.caption),
+                          Text(
+                            locState.location != null
+                                ? '${locState.location!.latitude.toStringAsFixed(4)}, ${locState.location!.longitude.toStringAsFixed(4)}'
+                                : 'UNACQUIRED / NONE',
+                            style: AppTypography.caption.copyWith(fontFamily: 'monospace'),
+                          ),
+                        ],
+                      ),
+                      if (locState.errorMessage != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Error: ${locState.errorMessage}',
+                          style: AppTypography.caption.copyWith(color: AppColors.criticalRed),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Acquire / Refresh GPS Fix'),
+                        onPressed: () {
+                          ref
+                              .read(ambulanceLocationProvider.notifier)
+                              .fetchLocation(requestPermissionIfNeeded: true);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Section 5: System Reset
             _buildSectionHeader(Icons.restart_alt_rounded, 'SYSTEM WORKFLOW RESET'),
             const SizedBox(height: 8),
             BedLinkButton(

@@ -56,7 +56,9 @@ class HospitalDiscoveryResult {
     this.dataSourceLabel = 'MOCK_FIXTURE',
     this.isRealBackend = false,
     this.isRlsBlocked = false,
+    this.isRealRoutingUsed = false,
     this.errorMessage,
+    this.routingErrorMessage,
   });
 
   /// Candidate hospitals within the discovery radius, sorted and ranked.
@@ -83,8 +85,14 @@ class HospitalDiscoveryResult {
   /// Whether queries were blocked by Supabase RLS.
   final bool isRlsBlocked;
 
+  /// Whether candidate driving times and distances were computed using real ORS routing.
+  final bool isRealRoutingUsed;
+
   /// Optional error or diagnostic message.
   final String? errorMessage;
+
+  /// Optional routing-specific error or diagnostic message.
+  final String? routingErrorMessage;
 
   bool get isEmpty => matches.isEmpty;
   bool get isNotEmpty => matches.isNotEmpty;

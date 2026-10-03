@@ -16,6 +16,7 @@ enum LocationStateStatus {
   permissionDenied,
   permissionDeniedForever,
   serviceDisabled,
+  permissionGranted,
   locating,
   ready,
   error,

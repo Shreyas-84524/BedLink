@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../features/hospital/presentation/providers/hospital_repository_provider.dart';
 import '../../errors/app_exception.dart';
 import 'geolocator_location_repository.dart';
 import 'location_models.dart';
 import 'location_repository.dart';
+import 'mock_location_repository.dart';
 
 /// Provider exposing the active [LocationRepository] implementation.
-/// Defaults to [GeolocatorLocationRepository], easily overridable in tests.
+/// Dynamically resolves to [GeolocatorLocationRepository] in real Supabase mode,
+/// or [MockLocationRepository] in mock / test fixtures mode.
 final locationRepositoryProvider = Provider<LocationRepository>((ref) {
-  return const GeolocatorLocationRepository();
+  final hospitalRepo = ref.watch(hospitalRepositoryProvider);
+  if (hospitalRepo.isRealBackend) {
+    return const GeolocatorLocationRepository();
+  }
+  return MockLocationRepository();
 });
 
 /// State representation of the ambulance device's GPS and positioning status.
@@ -43,14 +50,20 @@ class AmbulanceLocationState {
 
   bool get isServiceDisabled => status == LocationStateStatus.serviceDisabled;
 
+  bool get isPermissionGranted =>
+      status == LocationStateStatus.permissionGranted ||
+      status == LocationStateStatus.locating ||
+      status == LocationStateStatus.ready;
+
   AmbulanceLocationState copyWith({
     LocationStateStatus? status,
     AmbulanceLocation? location,
     String? errorMessage,
+    bool clearLocation = false,
   }) {
     return AmbulanceLocationState(
       status: status ?? this.status,
-      location: location ?? this.location,
+      location: clearLocation ? null : (location ?? this.location),
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -72,16 +85,129 @@ class AmbulanceLocationState {
 class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
   @override
   AmbulanceLocationState build() {
+    final hospitalRepo = ref.watch(hospitalRepositoryProvider);
+    if (hospitalRepo.isRealBackend) {
+      return const AmbulanceLocationState(
+        status: LocationStateStatus.initial,
+        location: null,
+      );
+    }
     return AmbulanceLocationState.initial();
   }
 
-  /// Attempts to acquire current device GPS position.
-  Future<void> fetchLocation({bool requestPermissionIfNeeded = true}) async {
+  /// Validates location services and user permissions before allowing GPS acquisition or hospital discovery.
+  ///
+  /// Required flow:
+  /// 1. Check if location services are enabled on the host device (`isLocationServiceEnabled()`).
+  ///    - if disabled: status = serviceDisabled, returns false.
+  /// 2. If enabled, inspect current permission status (`checkPermission()`).
+  ///    - if denied: call `requestPermission()`.
+  /// 3. Handle resulting status:
+  ///    - if denied: status = permissionDenied, returns false.
+  ///    - if deniedForever: status = permissionDeniedForever, returns false.
+  ///    - if granted: status = permissionGranted, returns true.
+  ///
+  /// In real mode, coordinates remain null until Phase B GPS acquisition.
+  Future<bool> validateLocationPermission() async {
     final repository = ref.read(locationRepositoryProvider);
+    final hospitalRepo = ref.read(hospitalRepositoryProvider);
+    final isReal = hospitalRepo.isRealBackend;
+
+    state = state.copyWith(
+      status: LocationStateStatus.checkingPermission,
+      errorMessage: null,
+      clearLocation: isReal,
+    );
+
+    // 1. Check location services
+    final serviceEnabled = await repository.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      state = state.copyWith(
+        status: LocationStateStatus.serviceDisabled,
+        errorMessage:
+            'Device location services are turned off. Please enable GPS in device settings to discover nearby hospitals.',
+        clearLocation: isReal,
+      );
+      return false;
+    }
+
+    // 2. Check permission
+    var permission = await repository.checkPermission();
+    if (permission == LocationPermissionStatus.denied) {
+      permission = await repository.requestPermission();
+    }
+
+    // 3. Handle resulting status
+    if (permission == LocationPermissionStatus.denied) {
+      state = state.copyWith(
+        status: LocationStateStatus.permissionDenied,
+        errorMessage:
+            'BedLink requires location permission to calculate distance and find the nearest emergency hospital.',
+        clearLocation: isReal,
+      );
+      return false;
+    }
+
+    if (permission == LocationPermissionStatus.deniedForever) {
+      state = state.copyWith(
+        status: LocationStateStatus.permissionDeniedForever,
+        errorMessage:
+            'Location permission is permanently blocked in system settings. Please enable location permissions to continue.',
+        clearLocation: isReal,
+      );
+      return false;
+    }
+
+    if (permission == LocationPermissionStatus.granted) {
+      state = state.copyWith(
+        status: state.location != null
+            ? LocationStateStatus.ready
+            : LocationStateStatus.permissionGranted,
+        errorMessage: null,
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      status: LocationStateStatus.error,
+      errorMessage: 'Unable to determine location permission status.',
+      clearLocation: isReal,
+    );
+    return false;
+  }
+
+  Future<void>? _inFlightAcquisition;
+
+  /// Acquires real current GPS coordinates from the device hardware sensor.
+  ///
+  /// Prevents duplicate simultaneous acquisitions and ensures repeated widget rebuilds
+  /// do not repeatedly trigger GPS queries.
+  Future<void> acquireLocation({bool force = false}) async {
+    if (_inFlightAcquisition != null) {
+      return _inFlightAcquisition;
+    }
+
+    if (!force && state.status == LocationStateStatus.ready && state.location != null) {
+      return;
+    }
+
+    _inFlightAcquisition = _performAcquisition();
+    try {
+      await _inFlightAcquisition;
+    } finally {
+      _inFlightAcquisition = null;
+    }
+  }
+
+  Future<void> _performAcquisition() async {
+    final repository = ref.read(locationRepositoryProvider);
+    final hospitalRepo = ref.read(hospitalRepositoryProvider);
+    final isReal = hospitalRepo.isRealBackend;
 
     state = state.copyWith(
       status: LocationStateStatus.locating,
       errorMessage: null,
+      clearLocation: isReal,
     );
 
     try {
@@ -106,13 +232,43 @@ class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
       state = state.copyWith(
         status: targetStatus,
         errorMessage: e.message,
+        clearLocation: isReal,
       );
     } catch (e) {
       state = state.copyWith(
         status: LocationStateStatus.error,
         errorMessage: 'Failed to acquire location: $e',
+        clearLocation: isReal,
       );
     }
+  }
+
+  /// Attempts to acquire current device GPS position.
+  Future<void> fetchLocation({
+    bool requestPermissionIfNeeded = true,
+    bool force = false,
+  }) async {
+    await acquireLocation(force: force);
+  }
+
+  /// Explicit retry action for acquiring device location after error or timeout.
+  Future<void> retryLocation() async {
+    await acquireLocation(force: true);
+  }
+
+  /// Explicit refresh action for re-acquiring GPS location.
+  Future<void> refreshLocation() async {
+    await acquireLocation(force: true);
+  }
+
+  /// Opens host system application settings page.
+  Future<bool> openAppSettings() async {
+    return await ref.read(locationRepositoryProvider).openAppSettings();
+  }
+
+  /// Opens host system location settings page.
+  Future<bool> openLocationSettings() async {
+    return await ref.read(locationRepositoryProvider).openLocationSettings();
   }
 
   /// Manually injects or overrides current location (e.g. for simulations / tests).
@@ -133,7 +289,15 @@ class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
 
   /// Resets state back to initial defaults.
   void reset() {
-    state = AmbulanceLocationState.initial();
+    final hospitalRepo = ref.read(hospitalRepositoryProvider);
+    if (hospitalRepo.isRealBackend) {
+      state = const AmbulanceLocationState(
+        status: LocationStateStatus.initial,
+        location: null,
+      );
+    } else {
+      state = AmbulanceLocationState.initial();
+    }
   }
 }
 
