@@ -66,7 +66,7 @@ class GeolocatorLocationRepository implements LocationRepository {
 
     if (permission == LocationPermissionStatus.denied) {
       throw const LocationException(
-        'Location permission denied by user. Falling back to default dispatch location.',
+        'Location permission denied by user. Real device location is required for hospital discovery.',
         code: ErrorCodes.locationDenied,
         isPermissionDenied: true,
       );
@@ -104,6 +104,26 @@ class GeolocatorLocationRepository implements LocationRepository {
         code: ErrorCodes.noLocation,
         cause: e,
       );
+    }
+  }
+
+  @override
+  Future<bool> openAppSettings() async {
+    try {
+      return await Geolocator.openAppSettings();
+    } catch (e) {
+      debugPrint('Error opening app settings: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    try {
+      return await Geolocator.openLocationSettings();
+    } catch (e) {
+      debugPrint('Error opening location settings: $e');
+      return false;
     }
   }
 

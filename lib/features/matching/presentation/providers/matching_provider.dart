@@ -44,11 +44,13 @@ class MatchingState {
     return MatchingState(
       isSearching: startSearching,
       searchRadiusKm: 15,
-      searchingProgressMessage: 'Evaluating candidate hospitals within 15km...',
-      matches: MockHospitalData.standardCandidates,
+      searchingProgressMessage: isRealBackend
+          ? 'Acquiring GPS location for nearby discovery...'
+          : 'Evaluating candidate hospitals within 15km...',
+      matches: isRealBackend ? const [] : MockHospitalData.standardCandidates,
       fixtureMode: MatchingFixtureMode.standardFive,
       activeFilter: 'ALL',
-      hasSearched: true,
+      hasSearched: !isRealBackend,
       isRealBackend: isRealBackend,
       dataSourceLabel: dataSourceLabel,
     );
@@ -238,12 +240,163 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
   /// Triggers searching progression across radius thresholds (5km -> 10km -> 15km).
   ///
-  /// When backed by [SupabaseHospitalRepository], loads real hospital facilities.
+  /// In real mode, halts and requires real device GPS fix; stops discovery if location
+  /// is disabled or denied, without ever falling back to mock Mumbai coordinates.
   /// If blocked by RLS (0 policies default-deny), gracefully falls back to mock candidates
   /// and marks [MatchingState.isRlsBlocked] without crashing.
   Future<void> runSearchProgression({
     Duration stepDuration = const Duration(milliseconds: 600),
   }) async {
+    final repository = ref.read(hospitalRepositoryProvider);
+    final discoveryRepo = ref.read(hospitalDiscoveryRepositoryProvider);
+
+    // If using real backend and in standard mode, handle real location acquisition first!
+    if (state.fixtureMode == MatchingFixtureMode.standardFive && repository.isRealBackend) {
+      state = state.copyWith(
+        isSearching: true,
+        searchRadiusKm: 5,
+        searchingProgressMessage: 'Acquiring GPS fix from device...',
+        hasSearched: false,
+        errorMessage: null,
+      );
+
+      var locState = ref.read(ambulanceLocationProvider);
+      if (locState.status != LocationStateStatus.ready || locState.location == null) {
+        await ref.read(ambulanceLocationProvider.notifier).fetchLocation(requestPermissionIfNeeded: true);
+        locState = ref.read(ambulanceLocationProvider);
+      }
+
+      // If location acquisition failed, STOP discovery immediately!
+      // NEVER silently use fake Mumbai coordinates in real mode!
+      if (locState.status != LocationStateStatus.ready || locState.location == null) {
+        String errorMsg;
+        switch (locState.status) {
+          case LocationStateStatus.serviceDisabled:
+            errorMsg = 'Location services are disabled on your device. Please enable GPS.';
+            break;
+          case LocationStateStatus.permissionDenied:
+            errorMsg = 'Location permission is required to discover nearby hospitals.';
+            break;
+          case LocationStateStatus.permissionDeniedForever:
+            errorMsg = 'Location permission is blocked. Please enable it in system settings.';
+            break;
+          case LocationStateStatus.error:
+          default:
+            errorMsg = locState.errorMessage ?? 'Unable to acquire current GPS location.';
+            break;
+        }
+
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: 5,
+          searchingProgressMessage: errorMsg,
+          matches: const [],
+          hasSearched: true,
+          isRealBackend: true,
+          dataSourceLabel: repository.dataSourceName,
+          errorMessage: errorMsg,
+          ambulanceLatitude: null,
+          ambulanceLongitude: null,
+        );
+        return;
+      }
+
+      final realLat = locState.location!.latitude;
+      final realLon = locState.location!.longitude;
+
+      state = state.copyWith(
+        searchRadiusKm: 5,
+        searchingProgressMessage: 'Scanning immediate 5km radius from current location...',
+      );
+
+      if (stepDuration > Duration.zero) {
+        await Future<void>.delayed(stepDuration);
+        if (!state.isSearching) return;
+      }
+
+      state = state.copyWith(
+        searchRadiusKm: 10,
+        searchingProgressMessage: 'Expanding discovery to 10km radius...',
+      );
+
+      if (stepDuration > Duration.zero) {
+        await Future<void>.delayed(stepDuration);
+        if (!state.isSearching) return;
+      }
+
+      state = state.copyWith(
+        searchRadiusKm: 15,
+        searchingProgressMessage: 'Evaluating candidate road travel times...',
+      );
+
+      if (stepDuration > Duration.zero) {
+        await Future<void>.delayed(stepDuration);
+        if (!state.isSearching) return;
+      }
+
+      final reqState = ref.read(bedRequirementProvider);
+
+      final result = await discoveryRepo.discoverHospitals(
+        latitude: realLat,
+        longitude: realLon,
+        selectedRequirements: reqState.selectedRequirements,
+      );
+
+      if (result.isRlsBlocked) {
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: 15,
+          searchingProgressMessage: 'Supabase RLS default-deny active. Showing mock fallback.',
+          matches: MockHospitalData.standardCandidates,
+          hasSearched: true,
+          isRealBackend: true,
+          dataSourceLabel: repository.dataSourceName,
+          isRlsBlocked: true,
+          errorMessage: 'Supabase RLS is enabled with 0 policies on public.hospitals (default deny). Approval of a safe client SELECT policy is required to read live data directly from Flutter.',
+          ambulanceLatitude: realLat,
+          ambulanceLongitude: realLon,
+          unsupportedRequirements: result.unsupportedRequirementsRequested,
+        );
+        return;
+      }
+
+      if (result.matches.isNotEmpty) {
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: result.effectiveRadiusKm,
+          searchingProgressMessage: '${result.matches.length} hospitals matched within ${result.effectiveRadiusKm}km',
+          matches: result.matches,
+          hasSearched: true,
+          isRealBackend: true,
+          dataSourceLabel: repository.dataSourceName,
+          isRlsBlocked: false,
+          errorMessage: null,
+          ambulanceLatitude: realLat,
+          ambulanceLongitude: realLon,
+          unsupportedRequirements: result.unsupportedRequirementsRequested,
+        );
+        return;
+      } else {
+        // Zero records returned: empty table or no matching facilities
+        state = state.copyWith(
+          isSearching: false,
+          searchRadiusKm: result.effectiveRadiusKm,
+          searchingProgressMessage: 'No compatible hospitals found in Supabase.',
+          matches: const [],
+          hasSearched: true,
+          isRealBackend: true,
+          dataSourceLabel: repository.dataSourceName,
+          isRlsBlocked: false,
+          errorMessage: result.errorMessage ?? 'No compatible hospitals found within ${result.effectiveRadiusKm}km.',
+          ambulanceLatitude: realLat,
+          ambulanceLongitude: realLon,
+          unsupportedRequirements: result.unsupportedRequirementsRequested,
+        );
+        return;
+      }
+    }
+
+    // Otherwise: Mock mode progression
     state = state.copyWith(
       isSearching: true,
       searchRadiusKm: 5,
@@ -276,80 +429,10 @@ class MatchingNotifier extends Notifier<MatchingState> {
       if (!state.isSearching) return;
     }
 
-    final repository = ref.read(hospitalRepositoryProvider);
-    final discoveryRepo = ref.read(hospitalDiscoveryRepositoryProvider);
-
-    // Get current ambulance coordinates or fallback to default
     final locState = ref.read(ambulanceLocationProvider);
     final lat = locState.location?.latitude ?? AmbulanceLocation.defaultMumbaiLat;
     final lon = locState.location?.longitude ?? AmbulanceLocation.defaultMumbaiLng;
 
-    // Read active patient clinical requirements
-    final reqState = ref.read(bedRequirementProvider);
-
-    // If using real backend and in standard mode, run real hospital discovery
-    if (state.fixtureMode == MatchingFixtureMode.standardFive && repository.isRealBackend) {
-      final result = await discoveryRepo.discoverHospitals(
-        latitude: lat,
-        longitude: lon,
-        selectedRequirements: reqState.selectedRequirements,
-      );
-
-      if (result.isRlsBlocked) {
-        state = state.copyWith(
-          isSearching: false,
-          searchRadiusKm: 15,
-          searchingProgressMessage: 'Supabase RLS default-deny active. Showing mock fallback.',
-          matches: MockHospitalData.standardCandidates,
-          hasSearched: true,
-          isRealBackend: true,
-          dataSourceLabel: repository.dataSourceName,
-          isRlsBlocked: true,
-          errorMessage: 'Supabase RLS is enabled with 0 policies on public.hospitals (default deny). Approval of a safe client SELECT policy is required to read live data directly from Flutter.',
-          ambulanceLatitude: lat,
-          ambulanceLongitude: lon,
-          unsupportedRequirements: result.unsupportedRequirementsRequested,
-        );
-        return;
-      }
-
-      if (result.matches.isNotEmpty) {
-        state = state.copyWith(
-          isSearching: false,
-          searchRadiusKm: result.effectiveRadiusKm,
-          searchingProgressMessage: '${result.matches.length} Mumbai hospitals matched within ${result.effectiveRadiusKm}km',
-          matches: result.matches,
-          hasSearched: true,
-          isRealBackend: true,
-          dataSourceLabel: repository.dataSourceName,
-          isRlsBlocked: false,
-          errorMessage: null,
-          ambulanceLatitude: lat,
-          ambulanceLongitude: lon,
-          unsupportedRequirements: result.unsupportedRequirementsRequested,
-        );
-        return;
-      } else {
-        // Zero records returned: likely default-deny RLS or empty table
-        state = state.copyWith(
-          isSearching: false,
-          searchRadiusKm: result.effectiveRadiusKm,
-          searchingProgressMessage: 'Supabase returned 0 records (RLS default-deny active). Showing mock fallback.',
-          matches: MockHospitalData.standardCandidates,
-          hasSearched: true,
-          isRealBackend: true,
-          dataSourceLabel: repository.dataSourceName,
-          isRlsBlocked: true,
-          errorMessage: result.errorMessage ?? 'Supabase RLS is enabled with 0 policies on public.hospitals (default deny). Approval of a safe client SELECT policy is required to read live data directly from Flutter.',
-          ambulanceLatitude: lat,
-          ambulanceLongitude: lon,
-          unsupportedRequirements: result.unsupportedRequirementsRequested,
-        );
-        return;
-      }
-    }
-
-    // Resolve candidates based on active fixture
     List<HospitalMatch> resolved;
     switch (state.fixtureMode) {
       case MatchingFixtureMode.standardFive:
@@ -386,6 +469,7 @@ class MatchingNotifier extends Notifier<MatchingState> {
                 : MockHospitalData.standardCandidates);
 
     final repository = ref.read(hospitalRepositoryProvider);
+    final locState = ref.read(ambulanceLocationProvider);
 
     state = state.copyWith(
       isSearching: false,
@@ -395,6 +479,8 @@ class MatchingNotifier extends Notifier<MatchingState> {
       hasSearched: true,
       isRealBackend: repository.isRealBackend,
       dataSourceLabel: repository.dataSourceName,
+      ambulanceLatitude: locState.location?.latitude,
+      ambulanceLongitude: locState.location?.longitude,
     );
   }
 

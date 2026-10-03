@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../features/hospital/presentation/providers/hospital_repository_provider.dart';
 import '../../errors/app_exception.dart';
 import 'geolocator_location_repository.dart';
 import 'location_models.dart';
 import 'location_repository.dart';
+import 'mock_location_repository.dart';
 
 /// Provider exposing the active [LocationRepository] implementation.
-/// Defaults to [GeolocatorLocationRepository], easily overridable in tests.
+/// Dynamically resolves to [GeolocatorLocationRepository] in real Supabase mode,
+/// or [MockLocationRepository] in mock / test fixtures mode.
 final locationRepositoryProvider = Provider<LocationRepository>((ref) {
-  return const GeolocatorLocationRepository();
+  final hospitalRepo = ref.watch(hospitalRepositoryProvider);
+  if (hospitalRepo.isRealBackend) {
+    return const GeolocatorLocationRepository();
+  }
+  return MockLocationRepository();
 });
 
 /// State representation of the ambulance device's GPS and positioning status.
@@ -47,10 +54,11 @@ class AmbulanceLocationState {
     LocationStateStatus? status,
     AmbulanceLocation? location,
     String? errorMessage,
+    bool clearLocation = false,
   }) {
     return AmbulanceLocationState(
       status: status ?? this.status,
-      location: location ?? this.location,
+      location: clearLocation ? null : (location ?? this.location),
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -72,16 +80,26 @@ class AmbulanceLocationState {
 class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
   @override
   AmbulanceLocationState build() {
+    final hospitalRepo = ref.watch(hospitalRepositoryProvider);
+    if (hospitalRepo.isRealBackend) {
+      return const AmbulanceLocationState(
+        status: LocationStateStatus.initial,
+        location: null,
+      );
+    }
     return AmbulanceLocationState.initial();
   }
 
   /// Attempts to acquire current device GPS position.
   Future<void> fetchLocation({bool requestPermissionIfNeeded = true}) async {
     final repository = ref.read(locationRepositoryProvider);
+    final hospitalRepo = ref.read(hospitalRepositoryProvider);
+    final isReal = hospitalRepo.isRealBackend;
 
     state = state.copyWith(
       status: LocationStateStatus.locating,
       errorMessage: null,
+      clearLocation: isReal,
     );
 
     try {
@@ -106,13 +124,25 @@ class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
       state = state.copyWith(
         status: targetStatus,
         errorMessage: e.message,
+        clearLocation: isReal,
       );
     } catch (e) {
       state = state.copyWith(
         status: LocationStateStatus.error,
         errorMessage: 'Failed to acquire location: $e',
+        clearLocation: isReal,
       );
     }
+  }
+
+  /// Opens host system application settings page.
+  Future<bool> openAppSettings() async {
+    return await ref.read(locationRepositoryProvider).openAppSettings();
+  }
+
+  /// Opens host system location settings page.
+  Future<bool> openLocationSettings() async {
+    return await ref.read(locationRepositoryProvider).openLocationSettings();
   }
 
   /// Manually injects or overrides current location (e.g. for simulations / tests).
@@ -133,7 +163,15 @@ class AmbulanceLocationNotifier extends Notifier<AmbulanceLocationState> {
 
   /// Resets state back to initial defaults.
   void reset() {
-    state = AmbulanceLocationState.initial();
+    final hospitalRepo = ref.read(hospitalRepositoryProvider);
+    if (hospitalRepo.isRealBackend) {
+      state = const AmbulanceLocationState(
+        status: LocationStateStatus.initial,
+        location: null,
+      );
+    } else {
+      state = AmbulanceLocationState.initial();
+    }
   }
 }
 

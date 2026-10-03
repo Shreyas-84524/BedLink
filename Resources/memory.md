@@ -19,36 +19,36 @@ Complete BedLink Flutter frontend & Supabase cloud backend integration (Ambulanc
 
 ## Current status
 - **Current Phase:** Phase 13 — Real Location + Hospital Discovery Integration
-- **Current Sub-Phase:** Phase 13 Verification Complete; Ready for User Manual Testing & Approval.
+- **Current Sub-Phase:** Phase 13 Location Defect Remediated; Ready for Manual Testing.
 - **Completed work:**
-  - Integrated `geolocator: ^13.0.2` and Android foreground location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`).
-  - Implemented `LocationRepository`, `GeolocatorLocationRepository`, `MockLocationRepository`, and `ambulanceLocationProvider` (Central Mumbai `18.9980°N, 72.8300°E` fallback).
-  - Implemented `GeoUtils.haversineDistanceKm` calculating spherical great-circle distances and human-friendly distance formatting.
-  - Added `latitude`, `longitude`, `hasCoordinates` to `HospitalMatch` and populated coordinates across mock and Supabase DTO models.
-  - Safely filtered out 21 null-coordinate hospitals from distance discovery without database modifications, preserving all 245 hospital records in `public.hospitals`.
-  - Implemented deterministic radius progression (`5 km -> 10 km -> 15 km max`) in `SupabaseHospitalDiscoveryRepository`.
-  - Supported real backend requirements (`icu_bed`, `general_bed`, `emergency_bed`, `trauma_care`) while flagging unsupported capabilities (`ventilator`, `oxygen_bed`, `pediatric_icu`, `cardiac_care`, `burns_care`) as unverified.
-  - Wired `hospitalDiscoveryRepositoryProvider` to `MatchingNotifier.runSearchProgression` while preserving Phase 6 frozen UI geometry and animations.
-  - Authored `PHASE_13_REPORT.md` (all 26 sections) and `HUMAN_INTERVENTION_PHASE_13.md`.
-  - Authored 33 new automated tests, bringing the test suite to **261 / 261 passing tests (100% pass rate)**.
-  - Zero database mutations; preserved all backend tables (`public.hospitals`, `public.beds`, `public.ambulance_requests`).
+  - Resolved manual test defect: eliminated silent Mumbai coordinate fallback (`18.9980, 72.8300`) in real mode.
+  - Bound `locationRepositoryProvider` dynamically to `hospitalRepository.isRealBackend`: resolves `GeolocatorLocationRepository` in real mode and `MockLocationRepository` in offline/mock mode.
+  - Initialized `AmbulanceLocationState.initial` with `location: null` when backed by real backend.
+  - Enforced GPS permission gate in `MatchingNotifier.runSearchProgression`: halts search, clears matches, and surfaces actionable error prompt when location services are disabled or permission denied/deniedForever.
+  - Added dedicated actionable status cards to `HospitalDiscoveryScreen`:
+    - `SERVICE DISABLED`: "LOCATION SERVICES DISABLED" with buttons "OPEN LOCATION SETTINGS" / "RETRY".
+    - `PERMISSION DENIED`: "LOCATION ACCESS REQUIRED" with button "ALLOW LOCATION".
+    - `PERMISSION DENIED FOREVER`: "LOCATION PERMISSION BLOCKED" with button "OPEN APP SETTINGS".
+    - `ERROR / TIMEOUT`: "UNABLE TO GET CURRENT LOCATION" with button "RETRY LOCATION".
+  - Implemented `openAppSettings()` and `openLocationSettings()` in `LocationRepository` via Geolocator.
+  - Added live GPS diagnostic section to `DevFixtureCenter` displaying location source (`REAL GPS` vs `MOCK FIXTURE`), status, and coordinates.
+  - Added 8 integration tests in `test/features/matching/location_discovery_integration_test.dart` validating permission flow, real repo selection, null coordinates on error, halted discovery on denied permission, settings action, exact coordinates propagation, and coordinate-dependent hospital ranking.
+  - Preserved working tree without creating new commits.
 
 ## Architecture & Integration Details
 - **Location Provider Location:** `lib/core/services/location/location_provider.dart`
-- **Geo Math Utility:** `lib/core/utils/geo_utils.dart`
-- **Discovery Repository Location:** `lib/features/matching/data/repositories/supabase_hospital_discovery_repository.dart`
+- **Location Repository:** `lib/core/services/location/location_repository.dart`
+- **Geolocator Implementation:** `lib/core/services/location/geolocator_location_repository.dart`
 - **Discovery Provider:** `lib/features/matching/presentation/providers/hospital_discovery_provider.dart`
-- **Real Supported Bed Types:** `icu_bed`, `general_bed`, `emergency_bed`
-- **Supported Capabilities:** `trauma_care`, `emergency_care`, `icu_care`
-- **Radius Progression:** 5 km -> 10 km -> 15 km ceiling
-- **Distance Metric:** Haversine great-circle distance (Road distance/ETA strictly deferred to Phase 14)
+- **Matching Provider:** `lib/features/matching/presentation/providers/matching_provider.dart`
+- **Matching Screen:** `lib/features/matching/presentation/screens/hospital_discovery_screen.dart`
+- **Dev Fixture Center:** `lib/shared/widgets/demo/dev_fixture_center.dart`
 
 ## Verification results
-- `flutter analyze`: 0 issues found (strict analysis enabled).
-- `flutter test`: 261/261 tests passed across all test suites (100% pass rate, zero regressions from 228 baseline).
-- `flutter build web`: Built cleanly with `--dart-define-from-file=config/supabase.json` (exit code 0).
-- Security audit: 0 raw secrets or private keys in codebase; `config/supabase.json` remains Git-ignored.
-- Database integrity: 100% preserved; zero DDL/DML statements executed.
+- `flutter analyze`: 0 issues found (clean static analysis).
+- `flutter test --concurrency=1`: 269/269 tests passed across all test suites (100% pass rate).
+- `flutter build web --release --dart-define-from-file=config/supabase.json`: Built cleanly (exit code 0).
+- Working tree: All edits remain unstaged/uncommitted awaiting manual testing.
 
 ## Next recommended task
-User manual testing and verification of Phase 13. Following explicit user approval, create approval commit `chore(phase-13): approve location and discovery integration` and proceed to Phase 14 (Real Routing + Map Integration).
+User manual testing of real location acquisition and hospital discovery in web/device runtime. Following approval, run `git add . && git commit -m "chore(phase-13): approve location and discovery integration"`.

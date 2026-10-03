@@ -14,6 +14,12 @@ abstract class LocationRepository {
   /// Obtains the current device coordinates.
   Future<AmbulanceLocation> getCurrentLocation();
 
+  /// Opens host system application settings page.
+  Future<bool> openAppSettings();
+
+  /// Opens host system location settings page.
+  Future<bool> openLocationSettings();
+
   /// Whether this repository is backed by real hardware GPS sensors.
   bool get isHardwareGps;
 }
