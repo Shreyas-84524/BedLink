@@ -81,3 +81,15 @@ Complete BedLink Flutter frontend & Supabase cloud backend integration (Ambulanc
   - `flutter build web --release --dart-define-from-file=config/supabase.json`: Built successfully (`√ Built build\web`).
 - **Next recommended task:**
   - Launch & Final Deployment. Platform is fully verified end-to-end.
+
+## PR preparation update — 2026-10-03
+- **Branch:** `backend-integration` merged with latest `origin/master` for PR readiness.
+- **Conflict resolution:**
+  - Resolved conflicts in `Resources/memory.md`, `lib/core/services/location/location_provider.dart`, `lib/features/matching/presentation/providers/matching_provider.dart`, `lib/features/matching/presentation/screens/hospital_discovery_screen.dart`, and `lib/shared/widgets/demo/dev_fixture_center.dart`.
+  - Preserved backend-integration Phase 15 behavior for real GPS acquisition, production mock isolation, routing metadata, and RLS-blocked live reads.
+  - Accepted incoming backend helper files from `origin/master`: `backend/app.py`, `backend/geocode_hospitals.py`, and `backend/update_hospital_coordinates.py`.
+- **Validation results for merge prep:**
+  - `git diff --check`: passed after removing incoming backend trailing whitespace.
+  - `flutter analyze`, `flutter analyze --no-pub`, and direct `dart analyze` were attempted but interrupted after hanging silently with no diagnostics.
+- **Known issues / blockers:**
+  - Local Flutter/Dart analyzer process did not complete in this environment; rerun `flutter analyze` and `flutter test --concurrency=1` before merge if the toolchain becomes responsive.
