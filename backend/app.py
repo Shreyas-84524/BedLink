@@ -36,6 +36,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
         sqrt(a), sqrt(1 - a)
     )
     
+
 @app.route("/")
 def home():
     return jsonify({

@@ -39,7 +39,10 @@ class HospitalMatch {
     required this.supportedCapabilities,
     required this.routeSummary,
     required this.emergencyPhone,
+    this.latitude,
+    this.longitude,
     this.scoreBreakdown,
+    this.isRealRoadRoute = false,
   });
 
   /// Unique hospital ID (e.g. 'kem_parel').
@@ -54,7 +57,20 @@ class HospitalMatch {
   /// Mumbai neighborhood / zone (e.g. 'Parel', 'Mahim').
   final String area;
 
-  /// Road distance in kilometers.
+  /// Geographic latitude in decimal degrees (-90 to +90).
+  final double? latitude;
+
+  /// Geographic longitude in decimal degrees (-180 to +180).
+  final double? longitude;
+
+  /// Whether valid coordinates exist for this facility.
+  bool get hasCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      !latitude!.isNaN &&
+      !longitude!.isNaN;
+
+  /// Road or straight-line distance in kilometers.
   final double distanceKm;
 
   /// Estimated road transit time in minutes.
@@ -95,6 +111,9 @@ class HospitalMatch {
 
   /// Optional detailed breakdown of scoring components.
   final MatchScoreBreakdown? scoreBreakdown;
+
+  /// Whether this candidate's ETA and distance are computed from real road routing (ORS).
+  final bool isRealRoadRoute;
 
   /// Returns available count for a specific resource type, or 0.
   int getAvailableCount(String resourceId) => availableBedCounts[resourceId] ?? 0;
@@ -137,7 +156,10 @@ class HospitalMatch {
     Set<String>? supportedCapabilities,
     String? routeSummary,
     String? emergencyPhone,
+    double? latitude,
+    double? longitude,
     MatchScoreBreakdown? scoreBreakdown,
+    bool? isRealRoadRoute,
   }) {
     return HospitalMatch(
       id: id ?? this.id,
@@ -157,7 +179,10 @@ class HospitalMatch {
       supportedCapabilities: supportedCapabilities ?? this.supportedCapabilities,
       routeSummary: routeSummary ?? this.routeSummary,
       emergencyPhone: emergencyPhone ?? this.emergencyPhone,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       scoreBreakdown: scoreBreakdown ?? this.scoreBreakdown,
+      isRealRoadRoute: isRealRoadRoute ?? this.isRealRoadRoute,
     );
   }
 

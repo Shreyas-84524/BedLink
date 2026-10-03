@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/data/supabase_client_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/models/user_role.dart';
@@ -33,6 +34,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    final config = ref.read(supabaseConfigProvider);
+    if (!config.useMock) {
+      _identifierController.clear();
+      _passwordController.clear();
+    }
+  }
+
+  @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
@@ -41,14 +52,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _onRoleChanged(UserRole newRole) {
     if (_selectedRole == newRole) return;
+    final config = ref.read(supabaseConfigProvider);
     setState(() {
       _selectedRole = newRole;
-      if (newRole == UserRole.ambulanceCrew) {
-        _identifierController.text = '1010101010';
-        _passwordController.text = 'password123';
+      if (config.useMock) {
+        if (newRole == UserRole.ambulanceCrew) {
+          _identifierController.text = '1010101010';
+          _passwordController.text = 'password123';
+        } else {
+          _identifierController.text = '9090909090';
+          _passwordController.text = 'password123';
+        }
       } else {
-        _identifierController.text = '9090909090';
-        _passwordController.text = 'password123';
+        _identifierController.clear();
+        _passwordController.clear();
       }
     });
     ref.read(sessionProvider.notifier).clearError();
@@ -276,38 +293,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Fast Demo Shortcuts Card
-                        BedLinkCard(
-                          variant: BedLinkCardVariant.muted,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'DEMO TEST CREDENTIALS',
-                                style: AppTypography.operationalLabel.copyWith(
-                                  fontSize: 10,
-                                  color: AppColors.textSecondary,
+                        // Fast Demo Shortcuts Card (Mock Mode Only)
+                        if (ref.watch(supabaseConfigProvider).useMock) ...[
+                          BedLinkCard(
+                            variant: BedLinkCardVariant.muted,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'DEMO TEST CREDENTIALS',
+                                  style: AppTypography.operationalLabel.copyWith(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  BedLinkQuickAddChip(
-                                    label: '⚡ Fill Demo Crew (101)',
-                                    onTap: _fillDemoAmbulance,
-                                  ),
-                                  BedLinkQuickAddChip(
-                                    label: '⚡ Fill Demo Hospital (KEM)',
-                                    onTap: _fillDemoHospital,
-                                  ),
-                                ],
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    BedLinkQuickAddChip(
+                                      label: '⚡ Fill Demo Crew (101)',
+                                      onTap: _fillDemoAmbulance,
+                                    ),
+                                    BedLinkQuickAddChip(
+                                      label: '⚡ Fill Demo Hospital (KEM)',
+                                      onTap: _fillDemoHospital,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
 

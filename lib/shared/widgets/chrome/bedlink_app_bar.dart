@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/data/supabase_client_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../providers/session_provider.dart';
+import '../demo/dev_fixture_center.dart';
 import 'bedlink_logo.dart';
 import 'med_net_live_badge.dart';
 
@@ -142,6 +144,12 @@ class BedLinkAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ],
         ...?actions,
+        if (ref.watch(supabaseConfigProvider).useMock)
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, size: 20, color: AppColors.secondaryTeal),
+            tooltip: 'Dev Fixture Center (Mock Mode Only)',
+            onPressed: () => DevFixtureCenter.show(context),
+          ),
         IconButton(
           icon: const Icon(Icons.logout_outlined, size: 20, color: AppColors.textSecondary),
           tooltip: 'Sign Out / Switch Role',
