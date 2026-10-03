@@ -99,8 +99,11 @@ class GeolocatorLocationRepository implements LocationRepository {
         isMock: position.isMocked,
       );
     } catch (e) {
+      final isTimeout = e.toString().toLowerCase().contains('timeout');
       throw LocationException(
-        'Failed to acquire GPS fix: $e',
+        isTimeout
+            ? 'GPS acquisition timed out. Please check device location signal and try again.'
+            : 'Failed to acquire GPS fix: $e',
         code: ErrorCodes.noLocation,
         cause: e,
       );

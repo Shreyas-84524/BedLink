@@ -9,6 +9,7 @@ import '../../../../shared/widgets/buttons/bedlink_button.dart';
 import '../../../../shared/widgets/cards/bedlink_card.dart';
 import '../../../../shared/widgets/chrome/bedlink_logo.dart';
 import '../../../../shared/widgets/chrome/med_net_live_badge.dart';
+import '../../../ambulance/presentation/providers/emergency_request_provider.dart';
 
 /// Professional BedLink Startup / Splash Screen.
 ///
@@ -30,20 +31,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _simulateStartupSequence() async {
-    // Fast 600ms startup verification
+    // Restore persisted session from Supabase/Auth repository
+    await ref.read(sessionProvider.notifier).restoreSession();
+
+    // Fast startup verification
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (mounted) {
       setState(() {
         _isInitializing = false;
       });
 
-      // If user is already authenticated, router redirect will take them to their shell
+      // If user is already authenticated, restore active in-flight request and route
       final session = ref.read(sessionProvider);
       if (session.isAuthenticated) {
         if (session.isAmbulance) {
-          context.go('/ambulance');
+          final ambulanceId = session.userId ?? 'AMB-108';
+          await ref.read(activeEmergencyRequestProvider.notifier).restoreActiveRequest(ambulanceId);
+          if (mounted) {
+            context.go('/ambulance');
+          }
         } else if (session.isHospital) {
-          context.go('/hospital');
+          if (mounted) {
+            context.go('/hospital');
+          }
         }
       }
     }

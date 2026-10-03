@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/data/supabase_client_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
@@ -19,25 +20,36 @@ class HospitalRequestsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(hospitalStateProvider);
     final requests = state.incomingRequests;
+    final isMock = ref.watch(supabaseConfigProvider).useMock;
 
     return AppScaffold(
       title: 'INCOMING REQUESTS',
       subtitle: '${state.hospitalName} • Emergency Triage',
       actions: [
-        IconButton(
-          icon: const Icon(Icons.add_alert_outlined),
-          tooltip: 'Simulate Incoming Emergency Offer',
-          onPressed: () {
-            ref.read(hospitalStateProvider.notifier).injectMockRequest();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Simulated new incoming emergency triage offer received.'),
-                duration: Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-        ),
+        if (isMock)
+          IconButton(
+            icon: const Icon(Icons.add_alert_outlined),
+            tooltip: 'Simulate Incoming Emergency Offer',
+            onPressed: () {
+              ref.read(hospitalStateProvider.notifier).injectMockRequest();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Simulated new incoming emergency triage offer received.'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          )
+        else
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Incoming Emergency Offers',
+            onPressed: () {
+              ref.read(hospitalStateProvider.notifier).loadLiveRequests();
+              ref.read(hospitalStateProvider.notifier).refreshBedInventory();
+            },
+          ),
       ],
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -111,14 +123,25 @@ class HospitalRequestsScreen extends ConsumerWidget {
                     style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 16),
-                  BedLinkButton(
-                    label: 'SIMULATE INBOUND CALL',
-                    icon: Icons.add_call,
-                    variant: BedLinkButtonVariant.secondary,
-                    onPressed: () {
-                      ref.read(hospitalStateProvider.notifier).injectMockRequest();
-                    },
-                  ),
+                  if (isMock)
+                    BedLinkButton(
+                      label: 'SIMULATE INBOUND CALL',
+                      icon: Icons.add_call,
+                      variant: BedLinkButtonVariant.secondary,
+                      onPressed: () {
+                        ref.read(hospitalStateProvider.notifier).injectMockRequest();
+                      },
+                    )
+                  else
+                    BedLinkButton(
+                      label: 'REFRESH INCOMING REQUESTS',
+                      icon: Icons.refresh_rounded,
+                      variant: BedLinkButtonVariant.secondary,
+                      onPressed: () {
+                        ref.read(hospitalStateProvider.notifier).loadLiveRequests();
+                        ref.read(hospitalStateProvider.notifier).refreshBedInventory();
+                      },
+                    ),
                 ],
               ),
             ),

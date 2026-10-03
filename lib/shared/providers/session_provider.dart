@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/data/supabase_client_provider.dart';
 import '../../features/auth/data/repositories/mock_auth_repository.dart';
+import '../../features/auth/data/repositories/supabase_auth_repository.dart';
 import '../../features/auth/domain/models/auth_credentials.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../models/user_role.dart';
@@ -90,9 +93,14 @@ class SessionState {
   }
 }
 
-/// Provider for the AuthRepository (swappable in Phase 11)
+/// Provider for the AuthRepository with dynamic switching between Mock and Supabase Cloud.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return MockAuthRepository();
+  final config = ref.watch(supabaseConfigProvider);
+  final client = ref.watch(supabaseClientProvider);
+  if (config.useMock || client == null) {
+    return MockAuthRepository();
+  }
+  return SupabaseAuthRepository(client: client);
 });
 
 /// Central Session Notifier managing active login state across the Flutter app.
@@ -102,7 +110,21 @@ class SessionNotifier extends Notifier<SessionState> {
   @override
   SessionState build() {
     _authRepository = ref.read(authRepositoryProvider);
+    // Asynchronously restore persisted session if available
+    Future.microtask(() => restoreSession());
     return SessionState.unauthenticated();
+  }
+
+  /// Restore active session from Supabase or local storage.
+  Future<void> restoreSession() async {
+    try {
+      final session = await _authRepository.getCurrentSession();
+      if (session.isAuthenticated) {
+        state = session;
+      }
+    } catch (e) {
+      debugPrint('Failed to restore session: $e');
+    }
   }
 
   /// Perform login using typed credentials via the repository.

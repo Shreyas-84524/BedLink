@@ -30,9 +30,11 @@ class MatchingState {
     this.dataSourceLabel = 'MOCK_FIXTURE',
     this.errorMessage,
     this.isRlsBlocked = false,
+    this.isRealRoutingUsed = false,
     this.ambulanceLatitude,
     this.ambulanceLongitude,
     this.unsupportedRequirements = const [],
+    this.routingErrorMessage,
   });
 
   /// Initial state: ready with standard candidates or auto-searching.
@@ -89,6 +91,9 @@ class MatchingState {
   /// Whether queries to the live backend were blocked by Row-Level Security (default deny).
   final bool isRlsBlocked;
 
+  /// Whether candidate driving times and distances were computed via real ORS routing.
+  final bool isRealRoutingUsed;
+
   /// Current GPS latitude of the searching ambulance unit.
   final double? ambulanceLatitude;
 
@@ -97,6 +102,9 @@ class MatchingState {
 
   /// List of requested clinical requirement codes that lack backend support.
   final List<String> unsupportedRequirements;
+
+  /// Optional routing-specific error message.
+  final String? routingErrorMessage;
 
   /// Top recommended #1 candidate, if any.
   HospitalMatch? get primaryMatch => matches.isNotEmpty ? matches.first : null;
@@ -143,9 +151,11 @@ class MatchingState {
     String? dataSourceLabel,
     String? errorMessage,
     bool? isRlsBlocked,
+    bool? isRealRoutingUsed,
     double? ambulanceLatitude,
     double? ambulanceLongitude,
     List<String>? unsupportedRequirements,
+    String? routingErrorMessage,
   }) {
     return MatchingState(
       isSearching: isSearching ?? this.isSearching,
@@ -160,10 +170,12 @@ class MatchingState {
       dataSourceLabel: dataSourceLabel ?? this.dataSourceLabel,
       errorMessage: errorMessage ?? this.errorMessage,
       isRlsBlocked: isRlsBlocked ?? this.isRlsBlocked,
+      isRealRoutingUsed: isRealRoutingUsed ?? this.isRealRoutingUsed,
       ambulanceLatitude: ambulanceLatitude ?? this.ambulanceLatitude,
       ambulanceLongitude: ambulanceLongitude ?? this.ambulanceLongitude,
       unsupportedRequirements:
           unsupportedRequirements ?? this.unsupportedRequirements,
+      routingErrorMessage: routingErrorMessage ?? this.routingErrorMessage,
     );
   }
 
@@ -219,6 +231,10 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
   /// Sets the fixture scenario mode (5 matches, 1 match, 0 matches) for testing & edge cases.
   void setFixtureMode(MatchingFixtureMode mode) {
+    if (state.isRealBackend) {
+      debugPrint('Fixture switching is disabled in real Supabase production mode.');
+      return;
+    }
     List<HospitalMatch> targetMatches;
     switch (mode) {
       case MatchingFixtureMode.standardFive:
@@ -252,6 +268,12 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
     // If using real backend and in standard mode, handle real location acquisition first!
     if (state.fixtureMode == MatchingFixtureMode.standardFive && repository.isRealBackend) {
+      final initialLocState = ref.read(ambulanceLocationProvider);
+      if (initialLocState.status == LocationStateStatus.locating) {
+        // Mandatory Rule: No discovery while state is locating.
+        return;
+      }
+
       state = state.copyWith(
         isSearching: true,
         searchRadiusKm: 5,
@@ -262,8 +284,13 @@ class MatchingNotifier extends Notifier<MatchingState> {
 
       var locState = ref.read(ambulanceLocationProvider);
       if (locState.status != LocationStateStatus.ready || locState.location == null) {
-        await ref.read(ambulanceLocationProvider.notifier).fetchLocation(requestPermissionIfNeeded: true);
-        locState = ref.read(ambulanceLocationProvider);
+        final hasPermission = await ref.read(ambulanceLocationProvider.notifier).validateLocationPermission();
+        if (!hasPermission) {
+          locState = ref.read(ambulanceLocationProvider);
+        } else {
+          await ref.read(ambulanceLocationProvider.notifier).acquireLocation();
+          locState = ref.read(ambulanceLocationProvider);
+        }
       }
 
       // If location acquisition failed, STOP discovery immediately!
@@ -346,8 +373,8 @@ class MatchingNotifier extends Notifier<MatchingState> {
         state = state.copyWith(
           isSearching: false,
           searchRadiusKm: 15,
-          searchingProgressMessage: 'Supabase RLS default-deny active. Showing mock fallback.',
-          matches: MockHospitalData.standardCandidates,
+          searchingProgressMessage: 'Supabase RLS default-deny active. Real records blocked.',
+          matches: const [],
           hasSearched: true,
           isRealBackend: true,
           dataSourceLabel: repository.dataSourceName,
@@ -370,27 +397,33 @@ class MatchingNotifier extends Notifier<MatchingState> {
           isRealBackend: true,
           dataSourceLabel: repository.dataSourceName,
           isRlsBlocked: false,
+          isRealRoutingUsed: result.isRealRoutingUsed,
           errorMessage: null,
           ambulanceLatitude: realLat,
           ambulanceLongitude: realLon,
           unsupportedRequirements: result.unsupportedRequirementsRequested,
+          routingErrorMessage: result.routingErrorMessage,
         );
         return;
       } else {
-        // Zero records returned: empty table or no matching facilities
+        // Zero records returned: empty table or no matching facilities within 15km
         state = state.copyWith(
           isSearching: false,
           searchRadiusKm: result.effectiveRadiusKm,
-          searchingProgressMessage: 'No compatible hospitals found in Supabase.',
+          searchingProgressMessage: result.errorMessage != null
+              ? 'Discovery search encountered an issue.'
+              : 'No compatible hospitals found within ${result.effectiveRadiusKm}km.',
           matches: const [],
           hasSearched: true,
           isRealBackend: true,
           dataSourceLabel: repository.dataSourceName,
           isRlsBlocked: false,
-          errorMessage: result.errorMessage ?? 'No compatible hospitals found within ${result.effectiveRadiusKm}km.',
+          isRealRoutingUsed: false,
+          errorMessage: result.errorMessage,
           ambulanceLatitude: realLat,
           ambulanceLongitude: realLon,
           unsupportedRequirements: result.unsupportedRequirementsRequested,
+          routingErrorMessage: result.routingErrorMessage,
         );
         return;
       }

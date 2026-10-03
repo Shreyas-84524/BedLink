@@ -9,7 +9,9 @@ import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/badges/bedlink_badge.dart';
 import '../../../../shared/widgets/buttons/bedlink_button.dart';
 import '../../../../shared/widgets/cards/bedlink_card.dart';
+import '../../../../shared/widgets/errors/bedlink_error_state.dart';
 import '../../../../shared/widgets/inputs/bedlink_validation_message.dart';
+import '../../../../shared/widgets/loading/bedlink_loading_indicator.dart';
 import '../../domain/models/hospital_match.dart';
 import '../providers/matching_provider.dart';
 import '../providers/selected_hospital_provider.dart';
@@ -34,11 +36,26 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final matchingState = ref.read(matchingProvider);
-      if (matchingState.isRealBackend && !matchingState.hasSearched) {
-        ref.read(matchingProvider.notifier).runSearchProgression();
+      final locState = ref.read(ambulanceLocationProvider);
+      if (matchingState.isRealBackend &&
+          !matchingState.hasSearched &&
+          locState.status == LocationStateStatus.initial) {
+        final permitted = await ref
+            .read(ambulanceLocationProvider.notifier)
+            .validateLocationPermission();
+        if (permitted && mounted) {
+          await ref.read(ambulanceLocationProvider.notifier).acquireLocation();
+          if (mounted) {
+            final updatedLoc = ref.read(ambulanceLocationProvider);
+            if (updatedLoc.status == LocationStateStatus.ready &&
+                updatedLoc.location != null) {
+              await ref.read(matchingProvider.notifier).runSearchProgression();
+            }
+          }
+        }
       }
     });
   }
@@ -54,16 +71,46 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
     final matchingNotifier = ref.read(matchingProvider.notifier);
     final locState = ref.watch(ambulanceLocationProvider);
 
+    ref.listen<AmbulanceLocationState>(ambulanceLocationProvider, (previous, next) {
+      if (matchingState.isRealBackend &&
+          !matchingState.isSearching &&
+          next.status == LocationStateStatus.ready &&
+          next.location != null &&
+          previous?.status != LocationStateStatus.ready &&
+          !matchingState.hasSearched) {
+        matchingNotifier.runSearchProgression();
+      }
+    });
+
     return AppScaffold(
       title: 'HOSPITAL MATCHES',
       subtitle: 'Step 3 of 5 • Multi-Criteria Ranking',
       actions: [
         IconButton(
-          tooltip: 'Refresh Search',
+          tooltip: 'Refresh Location',
           icon: const Icon(Icons.refresh_rounded, color: AppColors.secondaryTeal),
-          onPressed: matchingState.isSearching
+          onPressed: (matchingState.isSearching || locState.isLoading)
               ? null
-              : () => matchingNotifier.runSearchProgression(),
+              : () async {
+                  if (matchingState.isRealBackend) {
+                    final granted = await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .validateLocationPermission();
+                    if (!granted) return;
+                    await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .refreshLocation();
+                    if (context.mounted) {
+                      final updatedLoc = ref.read(ambulanceLocationProvider);
+                      if (updatedLoc.status == LocationStateStatus.ready &&
+                          updatedLoc.location != null) {
+                        await matchingNotifier.runSearchProgression();
+                      }
+                    }
+                    return;
+                  }
+                  await matchingNotifier.runSearchProgression();
+                },
         ),
       ],
       child: SafeArea(
@@ -137,60 +184,202 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
 
               // Content: Location Action Card, Results, or Empty State
               if (matchingState.isRealBackend &&
+                  locState.status == LocationStateStatus.locating) ...[
+                const BedLinkLoadingIndicator(
+                  isCard: true,
+                  statusText: 'GETTING CURRENT LOCATION...',
+                  subtitle:
+                      'Acquiring high-accuracy GPS coordinates from device sensors...',
+                ),
+              ] else if (matchingState.isRealBackend &&
                   !matchingState.isSearching &&
                   locState.status == LocationStateStatus.serviceDisabled) ...[
-                _buildLocationActionCard(
+                BedLinkErrorState(
                   title: 'LOCATION SERVICES DISABLED',
-                  description:
+                  message:
                       'Device location services are turned off. Please enable GPS in device settings to discover nearby hospitals.',
                   icon: Icons.location_off_rounded,
-                  buttonLabel: 'OPEN LOCATION SETTINGS',
-                  buttonIcon: Icons.settings_rounded,
-                  onPrimaryTap: () => ref
+                  primaryActionLabel: 'OPEN LOCATION SETTINGS',
+                  primaryActionIcon: Icons.settings_rounded,
+                  onPrimaryAction: () => ref
                       .read(ambulanceLocationProvider.notifier)
                       .openLocationSettings(),
-                  secondaryButtonLabel: 'RETRY',
-                  onSecondaryTap: () => matchingNotifier.runSearchProgression(),
+                  secondaryActionLabel: 'TRY AGAIN',
+                  secondaryActionIcon: Icons.refresh_rounded,
+                  onSecondaryAction: () async {
+                    final permitted = await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .validateLocationPermission();
+                    if (permitted) {
+                      await ref
+                          .read(ambulanceLocationProvider.notifier)
+                          .acquireLocation();
+                      final updatedLoc = ref.read(ambulanceLocationProvider);
+                      if (updatedLoc.status == LocationStateStatus.ready &&
+                          updatedLoc.location != null) {
+                        await matchingNotifier.runSearchProgression();
+                      }
+                    }
+                  },
                 ),
               ] else if (matchingState.isRealBackend &&
                   !matchingState.isSearching &&
                   locState.status == LocationStateStatus.permissionDenied) ...[
-                _buildLocationActionCard(
+                BedLinkErrorState(
                   title: 'LOCATION ACCESS REQUIRED',
-                  description:
+                  message:
                       'BedLink requires location permission to calculate distance and find the nearest emergency hospital.',
                   icon: Icons.location_disabled_rounded,
-                  buttonLabel: 'ALLOW LOCATION',
-                  buttonIcon: Icons.check_circle_outline_rounded,
-                  onPrimaryTap: () => matchingNotifier.runSearchProgression(),
+                  primaryActionLabel: 'TRY AGAIN',
+                  primaryActionIcon: Icons.refresh_rounded,
+                  onPrimaryAction: () async {
+                    final permitted = await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .validateLocationPermission();
+                    if (permitted) {
+                      await ref
+                          .read(ambulanceLocationProvider.notifier)
+                          .acquireLocation();
+                      final updatedLoc = ref.read(ambulanceLocationProvider);
+                      if (updatedLoc.status == LocationStateStatus.ready &&
+                          updatedLoc.location != null) {
+                        await matchingNotifier.runSearchProgression();
+                      }
+                    }
+                  },
                 ),
               ] else if (matchingState.isRealBackend &&
                   !matchingState.isSearching &&
                   locState.status == LocationStateStatus.permissionDeniedForever) ...[
-                _buildLocationActionCard(
+                BedLinkErrorState(
                   title: 'LOCATION PERMISSION BLOCKED',
-                  description:
+                  message:
                       'Location permission is permanently blocked in system settings. Please enable location permissions to continue.',
                   icon: Icons.block_rounded,
-                  variant: BedLinkCardVariant.critical,
-                  buttonLabel: 'OPEN APP SETTINGS',
-                  buttonIcon: Icons.settings_rounded,
-                  onPrimaryTap: () => ref
+                  isCritical: true,
+                  primaryActionLabel: 'OPEN APP SETTINGS',
+                  primaryActionIcon: Icons.settings_rounded,
+                  onPrimaryAction: () => ref
                       .read(ambulanceLocationProvider.notifier)
                       .openAppSettings(),
+                  secondaryActionLabel: 'TRY AGAIN',
+                  secondaryActionIcon: Icons.refresh_rounded,
+                  onSecondaryAction: () async {
+                    final permitted = await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .validateLocationPermission();
+                    if (permitted) {
+                      await ref
+                          .read(ambulanceLocationProvider.notifier)
+                          .acquireLocation();
+                      final updatedLoc = ref.read(ambulanceLocationProvider);
+                      if (updatedLoc.status == LocationStateStatus.ready &&
+                          updatedLoc.location != null) {
+                        await matchingNotifier.runSearchProgression();
+                      }
+                    }
+                  },
                 ),
               ] else if (matchingState.isRealBackend &&
                   !matchingState.isSearching &&
                   locState.status == LocationStateStatus.error) ...[
-                _buildLocationActionCard(
+                BedLinkErrorState(
                   title: 'UNABLE TO GET CURRENT LOCATION',
-                  description: locState.errorMessage ??
+                  message: locState.errorMessage ??
                       'Failed to acquire device GPS coordinates. Please check your signal and try again.',
                   icon: Icons.error_outline_rounded,
-                  variant: BedLinkCardVariant.critical,
-                  buttonLabel: 'RETRY LOCATION',
-                  buttonIcon: Icons.refresh_rounded,
-                  onPrimaryTap: () => matchingNotifier.runSearchProgression(),
+                  isCritical: true,
+                  primaryActionLabel: 'RETRY LOCATION',
+                  primaryActionIcon: Icons.refresh_rounded,
+                  onPrimaryAction: () async {
+                    await ref
+                        .read(ambulanceLocationProvider.notifier)
+                        .retryLocation();
+                    final updatedLoc = ref.read(ambulanceLocationProvider);
+                    if (updatedLoc.status == LocationStateStatus.ready &&
+                        updatedLoc.location != null) {
+                      await matchingNotifier.runSearchProgression();
+                    }
+                  },
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  matchingState.errorMessage != null &&
+                  !matchingState.isRlsBlocked &&
+                  matchingState.matches.isEmpty &&
+                  locState.status == LocationStateStatus.ready) ...[
+                BedLinkErrorState(
+                  title: 'DISCOVERY SEARCH FAILED',
+                  message: matchingState.errorMessage!,
+                  icon: Icons.cloud_off_rounded,
+                  primaryActionLabel: 'TRY AGAIN',
+                  primaryActionIcon: Icons.refresh_rounded,
+                  onPrimaryAction: () => matchingNotifier.runSearchProgression(),
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  !matchingState.hasSearched &&
+                  locState.status == LocationStateStatus.ready &&
+                  matchingState.matches.isEmpty) ...[
+                const BedLinkCard(
+                  variant: BedLinkCardVariant.recommended,
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Icon(
+                          Icons.my_location_rounded,
+                          color: AppColors.secondaryTeal,
+                          size: 40,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'LOCATION READY',
+                        style: AppTypography.cardTitle,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Device GPS coordinates acquired. Ready for hospital discovery (Phase C).',
+                        style: AppTypography.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  locState.status == LocationStateStatus.permissionGranted &&
+                  matchingState.matches.isEmpty) ...[
+                const BedLinkCard(
+                  variant: BedLinkCardVariant.recommended,
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Icon(
+                          Icons.check_circle_outline_rounded,
+                          color: AppColors.secondaryTeal,
+                          size: 40,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'LOCATION PERMISSION GRANTED',
+                        style: AppTypography.cardTitle,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Location services and permissions verified. Ready for GPS acquisition.',
+                        style: AppTypography.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ] else if (matchingState.matches.isEmpty)
                 _buildEmptyState(matchingNotifier)
@@ -367,65 +556,6 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
             variant: BedLinkButtonVariant.secondary,
             onPressed: () => context.go('/ambulance/requirements'),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLocationActionCard({
-    required String title,
-    required String description,
-    required IconData icon,
-    required String buttonLabel,
-    required IconData buttonIcon,
-    required VoidCallback onPrimaryTap,
-    String? secondaryButtonLabel,
-    VoidCallback? onSecondaryTap,
-    BedLinkCardVariant variant = BedLinkCardVariant.warning,
-  }) {
-    return BedLinkCard(
-      variant: variant,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Icon(
-              icon,
-              color: variant == BedLinkCardVariant.critical
-                  ? AppColors.criticalRed
-                  : AppColors.warningAmber,
-              size: 40,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: AppTypography.cardTitle,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: AppTypography.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          BedLinkButton(
-            label: buttonLabel,
-            icon: buttonIcon,
-            variant: BedLinkButtonVariant.primary,
-            onPressed: onPrimaryTap,
-          ),
-          if (secondaryButtonLabel != null && onSecondaryTap != null) ...[
-            const SizedBox(height: 8),
-            BedLinkButton(
-              label: secondaryButtonLabel,
-              icon: Icons.refresh_rounded,
-              variant: BedLinkButtonVariant.secondary,
-              onPressed: onSecondaryTap,
-            ),
-          ],
         ],
       ),
     );

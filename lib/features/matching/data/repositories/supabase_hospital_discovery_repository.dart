@@ -4,17 +4,22 @@ import '../../../hospital/domain/repositories/hospital_repository.dart';
 import '../../domain/models/hospital_match.dart';
 import '../../domain/repositories/hospital_discovery_repository.dart';
 
+import '../services/ors_matrix_service.dart';
+
 /// Real backend implementation of [HospitalDiscoveryRepository].
 ///
 /// Queries `public.hospitals` via [HospitalRepository], filters out null coordinates (21 records),
 /// calculates Haversine straight-line distances from the ambulance GPS coordinates,
 /// applies deterministic radius expansion (5km -> 10km -> 15km), and evaluates requirement compatibility.
+/// When [OrsMatrixService] is configured, queries real road driving durations & road distances.
 class SupabaseHospitalDiscoveryRepository implements HospitalDiscoveryRepository {
   const SupabaseHospitalDiscoveryRepository({
     required this.hospitalRepository,
+    this.matrixService,
   });
 
   final HospitalRepository hospitalRepository;
+  final OrsMatrixService? matrixService;
 
   @override
   bool get isRealBackend => hospitalRepository.isRealBackend;
@@ -49,11 +54,17 @@ class SupabaseHospitalDiscoveryRepository implements HospitalDiscoveryRepository
       }
 
       // Identify unsupported requirements requested by user
-      final unsupportedRequested = selectedRequirements.keys
-          .where((k) => kUnsupportedBackendResources.contains(k))
-          .toList();
+      final unsupportedRequested = selectedRequirements.keys.where((k) {
+        final norm = k.toLowerCase();
+        return kUnsupportedBackendResources.contains(norm) ||
+            norm.contains('ventilator') ||
+            norm.contains('oxygen') ||
+            norm.contains('pediatric') ||
+            norm.contains('cardiac') ||
+            norm.contains('burn');
+      }).toList();
 
-      // Filter out hospitals without coordinates (preserves 21 null-coordinate records safely)
+      // Filter out hospitals without coordinates (preserves null-coordinate records safely)
       final withCoords = allHospitals.where((h) => h.hasCoordinates).toList();
 
       // Compute distances and evaluate compatibility for all coordinate-bearing hospitals
@@ -101,37 +112,97 @@ class SupabaseHospitalDiscoveryRepository implements HospitalDiscoveryRepository
         ));
       }
 
+      // Filter to only clinically compatible facilities (preserves divertRisk, excludes incompatible)
+      final compatible = evaluated
+          .where((h) => h.recommendationTier != RecommendationTier.incompatible)
+          .toList();
+
       // Radius progression: 5 km -> 10 km -> 15 km
       int effectiveRadius = 5;
-      var candidatePool = evaluated.where((h) => h.distanceKm <= 5.0).toList();
+      var candidatePool = compatible.where((h) => h.distanceKm <= 5.0).toList();
 
-      if (candidatePool.length < 2 && evaluated.any((h) => h.distanceKm <= 10.0)) {
-        candidatePool = evaluated.where((h) => h.distanceKm <= 10.0).toList();
-        effectiveRadius = 10;
+      if (candidatePool.length < 2 && compatible.any((h) => h.distanceKm <= 10.0)) {
+        final within10 = compatible.where((h) => h.distanceKm <= 10.0).toList();
+        if (within10.length > candidatePool.length) {
+          candidatePool = within10;
+          effectiveRadius = 10;
+        }
       }
 
-      if (candidatePool.length < 2 && evaluated.any((h) => h.distanceKm <= 15.0)) {
-        candidatePool = evaluated.where((h) => h.distanceKm <= 15.0).toList();
+      if (candidatePool.length < 2 && compatible.any((h) => h.distanceKm <= 15.0)) {
+        final within15 = compatible.where((h) => h.distanceKm <= 15.0).toList();
+        if (within15.length > candidatePool.length) {
+          candidatePool = within15;
+          effectiveRadius = 15;
+        }
+      }
+
+      if (candidatePool.isEmpty) {
         effectiveRadius = 15;
       }
 
-      if (candidatePool.isEmpty && evaluated.isNotEmpty) {
-        candidatePool = evaluated;
-        effectiveRadius = 15;
+      bool isRealRoutingUsed = false;
+      String? routingError;
+
+      // Sub-Phase 14.3, 14.4 & 14.5: OpenRouteService Matrix Integration
+      // Query real road ETA and road distance for candidate hospitals when ORS is configured.
+      if (candidatePool.isNotEmpty && matrixService != null && matrixService!.config.isOrsConfigured) {
+        try {
+          final destinations = candidatePool
+              .map((h) => (latitude: h.latitude!, longitude: h.longitude!))
+              .toList();
+
+          final estimates = await matrixService!.getDistancesAndDurations(
+            originLat: latitude,
+            originLng: longitude,
+            destinations: destinations,
+          );
+
+          if (estimates.isNotEmpty) {
+            final updatedPool = <HospitalMatch>[];
+            for (var i = 0; i < candidatePool.length; i++) {
+              final h = candidatePool[i];
+              final estimate = estimates[i];
+              if (estimate != null) {
+                // Update with real road distance & duration from ORS
+                final updatedScore = _calculateScore(
+                  distanceKm: estimate.distanceKm,
+                  occupancyRate: h.occupancyRate,
+                  isCompatible: true,
+                );
+                updatedPool.add(h.copyWith(
+                  distanceKm: estimate.distanceKm,
+                  etaMinutes: estimate.durationMinutes,
+                  routeSummary: 'via ORS Matrix Road Corridor',
+                  matchScore: updatedScore,
+                  isRealRoadRoute: true,
+                ));
+              } else {
+                updatedPool.add(h);
+              }
+            }
+            candidatePool = updatedPool;
+            isRealRoutingUsed = true;
+          }
+        } on RoutingException catch (e) {
+          routingError = e.message;
+        } catch (e) {
+          routingError = 'Routing matrix failed: $e';
+        }
       }
 
       // Sort candidate pool:
-      // 1. Incompatible at bottom
-      // 2. Divert risk lower
-      // 3. Closest distance & highest match score
+      // When real routing is available, sort ascending by real road travel time (ETA),
+      // then by road distance, then by match score.
+      // Otherwise, sort ascending by geographic distance.
       candidatePool.sort((a, b) {
-        if (a.recommendationTier.isIncompatible != b.recommendationTier.isIncompatible) {
-          return a.recommendationTier.isIncompatible ? 1 : -1;
+        if (isRealRoutingUsed) {
+          final etaCmp = a.etaMinutes.compareTo(b.etaMinutes);
+          if (etaCmp != 0) return etaCmp;
         }
-        if (a.recommendationTier.isDivertRisk != b.recommendationTier.isDivertRisk) {
-          return a.recommendationTier.isDivertRisk ? 1 : -1;
-        }
-        return a.distanceKm.compareTo(b.distanceKm);
+        final distCmp = a.distanceKm.compareTo(b.distanceKm);
+        if (distCmp != 0) return distCmp;
+        return b.matchScore.compareTo(a.matchScore);
       });
 
       // Assign ranks and elevate top candidates
@@ -162,6 +233,8 @@ class SupabaseHospitalDiscoveryRepository implements HospitalDiscoveryRepository
         dataSourceLabel: dataSourceName,
         isRealBackend: isRealBackend,
         isRlsBlocked: false,
+        isRealRoutingUsed: isRealRoutingUsed,
+        routingErrorMessage: routingError,
       );
     } on HospitalRepositoryException catch (e) {
       return HospitalDiscoveryResult(
@@ -200,16 +273,47 @@ class SupabaseHospitalDiscoveryRepository implements HospitalDiscoveryRepository
       final reqCode = entry.key;
       final reqQty = entry.value;
 
-      // Supported bed types
-      if (kSupportedBedTypes.contains(reqCode)) {
-        final available = hospital.getAvailableCount(reqCode);
-        if (available < reqQty && available == 0) {
+      // Supported ICU evaluation (countable bed or care capability)
+      if (reqCode == 'icu_bed' || reqCode == 'icu') {
+        final available = hospital.getAvailableCount('icu_bed');
+        if (available < reqQty && available <= 0 && !hospital.hasCapability('icu_care')) {
+          return false;
+        }
+      } else if (reqCode == 'icu_care') {
+        if (!hospital.hasCapability('icu_care') && hospital.getAvailableCount('icu_bed') <= 0) {
           return false;
         }
       }
 
-      // Supported capabilities
-      if (kSupportedCapabilities.contains(reqCode)) {
+      // Supported Emergency evaluation (countable bed or care capability)
+      else if (reqCode == 'emergency_bed' || reqCode == 'emergency') {
+        final available = hospital.getAvailableCount('emergency_bed');
+        if (available < reqQty && available <= 0 && !hospital.hasCapability('emergency_care')) {
+          return false;
+        }
+      } else if (reqCode == 'emergency_care') {
+        if (!hospital.hasCapability('emergency_care') && hospital.getAvailableCount('emergency_bed') <= 0) {
+          return false;
+        }
+      }
+
+      // Supported Trauma Care evaluation (specialized surgical capability)
+      else if (reqCode == 'trauma_care' || reqCode == 'trauma') {
+        if (!hospital.hasCapability('trauma_care')) {
+          return false;
+        }
+      }
+
+      // Other supported bed types (general_bed)
+      else if (kSupportedBedTypes.contains(reqCode)) {
+        final available = hospital.getAvailableCount(reqCode);
+        if (available < reqQty && available <= 0) {
+          return false;
+        }
+      }
+
+      // Other supported capabilities
+      else if (kSupportedCapabilities.contains(reqCode)) {
         if (!hospital.hasCapability(reqCode)) {
           return false;
         }

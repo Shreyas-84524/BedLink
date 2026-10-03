@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/data/supabase_client_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
@@ -105,9 +106,11 @@ class HoldConfirmationScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
 
-                // Simulation Controls for Demo & Test Automation
-                MockOfferControllerBar(notifier: notifier),
-                const SizedBox(height: 16),
+                // Simulation Controls for Demo & Test Automation (Mock Mode Only)
+                if (ref.watch(supabaseConfigProvider).useMock) ...[
+                  MockOfferControllerBar(notifier: notifier),
+                  const SizedBox(height: 16),
+                ],
 
                 // Primary Dynamic Actions
                 if (offer.status.isAccepted) ...[

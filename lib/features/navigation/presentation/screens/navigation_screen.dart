@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/location/location_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
@@ -14,9 +15,9 @@ import '../../domain/models/navigation_lifecycle.dart';
 import '../providers/navigation_state_provider.dart';
 import '../widgets/arrival_confirmation_card.dart';
 import '../widgets/bed_held_banner.dart';
+import '../widgets/bedlink_route_map.dart';
 import '../widgets/completed_handoff_card.dart';
 import '../widgets/confirmed_destination_card.dart';
-import '../widgets/mock_route_map.dart';
 import '../widgets/route_instruction_card.dart';
 
 /// Navigation & Arrival Screen (Phase 9 scope).
@@ -33,11 +34,20 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   bool _showDevControls = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(navigationStateProvider.notifier).loadRealDirections();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final selectedHospital = ref.watch(selectedHospitalProvider);
     final patient = ref.watch(patientIntakeProvider);
     final navState = ref.watch(navigationStateProvider);
     final navNotifier = ref.read(navigationStateProvider.notifier);
+    final locState = ref.watch(ambulanceLocationProvider);
 
     // Fallback: If no hospital is selected in session, render safe recovery screen
     if (selectedHospital == null) {
@@ -110,11 +120,47 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             // 2. High-Visibility Bed Hold Banner (or unconfirmed warning)
             const BedHeldBanner(),
 
-            // 3. Mock Vector Route Map Canvas (custom painted polyline & beacons)
-            MockRouteMap(
+            // 3. Vector Route Map Canvas (MapLibre vector tiles with tactical canvas fallback)
+            BedlinkRouteMap(
               routeProgress: navState.routeProgress,
               destinationName: selectedHospital.name,
+              ambulanceLatitude: locState.location?.latitude,
+              ambulanceLongitude: locState.location?.longitude,
+              destinationLatitude: selectedHospital.latitude,
+              destinationLongitude: selectedHospital.longitude,
+              routeGeometry: navState.routeGeometry,
+              isRealRouting: navState.isRealRouting,
             ),
+            if (navState.routingError != null && !navState.status.isCompleted) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warningSurface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.warningBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: AppColors.warningDark,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Live ORS routing unavailable: ${navState.routingError}. Displaying estimated navigation guidance.',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.warningDark,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
 
             // 4. Completed Handoff Card (replaces instruction card when completed)

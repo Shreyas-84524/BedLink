@@ -42,6 +42,7 @@ class HospitalMatch {
     this.latitude,
     this.longitude,
     this.scoreBreakdown,
+    this.isRealRoadRoute = false,
   });
 
   /// Unique hospital ID (e.g. 'kem_parel').
@@ -111,6 +112,9 @@ class HospitalMatch {
   /// Optional detailed breakdown of scoring components.
   final MatchScoreBreakdown? scoreBreakdown;
 
+  /// Whether this candidate's ETA and distance are computed from real road routing (ORS).
+  final bool isRealRoadRoute;
+
   /// Returns available count for a specific resource type, or 0.
   int getAvailableCount(String resourceId) => availableBedCounts[resourceId] ?? 0;
 
@@ -155,6 +159,7 @@ class HospitalMatch {
     double? latitude,
     double? longitude,
     MatchScoreBreakdown? scoreBreakdown,
+    bool? isRealRoadRoute,
   }) {
     return HospitalMatch(
       id: id ?? this.id,
@@ -177,6 +182,7 @@ class HospitalMatch {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       scoreBreakdown: scoreBreakdown ?? this.scoreBreakdown,
+      isRealRoadRoute: isRealRoadRoute ?? this.isRealRoadRoute,
     );
   }
 

@@ -8,7 +8,7 @@ load_dotenv()
 
 API_KEY = os.getenv("GEOAPIFY_API_KEY")
 if not API_KEY:
-            
+
     raise ValueError("Geoapify API key missing from .env")
 
 INPUT_FILE = "hospitals_minus21.csv"

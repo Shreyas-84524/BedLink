@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/data/supabase_client_provider.dart';
 import '../../../core/services/location/location_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -27,6 +28,11 @@ class DevFixtureCenter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(supabaseConfigProvider);
+    if (!config.useMock) {
+      return const SizedBox.shrink();
+    }
+
     final connectivity = ref.watch(connectivityProvider);
     final connNotifier = ref.read(connectivityProvider.notifier);
     final coordinator = ref.read(mockEmergencyCoordinatorProvider);
