@@ -3,51 +3,52 @@
 Operational memory for BedLink development.
 
 ## Current responsibility
-Complete BedLink Flutter frontend (Ambulance Dispatch & Hospital Staff interfaces).
+Complete BedLink Flutter frontend & Supabase cloud backend integration (Ambulance Dispatch & Hospital Staff interfaces).
 
 ## Current development model
 15 Major Phases × 8 Sub-Phases = 120 Sub-Phases.
 
 ## Phase categorization
-- **Frontend-only phases:** Phases 1–10 (Mock/local functional flows, Riverpod state, repository interfaces)
+- **Frontend-only phases:** Phases 1–10 (Mock/local functional flows, Riverpod state, repository interfaces) — **COMPLETE & FROZEN**
 - **Core backend integration:** Phases 11–12 (Supabase Auth, PostgreSQL, RLS, Realtime)
+  - Phase 11: Supabase Connection + Existing Hospital Directory Integration — **COMPLETE & VERIFIED**
+  - Phase 12: Bed Availability & Live Inventory Synchronization — **COMPLETE & VERIFIED**
 - **External API integration:** Phases 13–15 (Geolocator, Discovery API, MapLibre/MapTiler, ORS Matrix/Directions, E2E Recovery)
+  - Phase 13: Real Location + Hospital Discovery Integration — **COMPLETE & VERIFIED**
+  - Phase 14: Real Routing + Map Integration (MapLibre, MapTiler, OpenRouteService) — **NEXT**
 
 ## Current status
-- **Current Phase:** Phase 8 — Complete Hospital Staff Frontend (Approved)
-- **Current Sub-Phase:** Phase 8 complete & approved; ready for Phase 9 (Active Navigation & Live Transit Frontend).
+- **Current Phase:** Phase 13 — Real Location + Hospital Discovery Integration
+- **Current Sub-Phase:** Phase 13 Location Defect Remediated; Ready for Manual Testing.
 - **Completed work:**
-  - Phases 1 through 7 completed, verified, and approved in Git history.
-  - Phase 8 Complete Hospital Staff Frontend fully implemented & verified:
-    - Sub-phase 8.1: Hospital Dashboard (`/hospital`) with live capacity snapshot, operational module navigation cards, and one-tap Confirm No Change.
-    - Sub-phase 8.2: Resource Inventory Screen (`/hospital/resources`) with Critical Care, Acute & Emergency, and Specialized Clinical Units categorization.
-    - Sub-phase 8.3: Fast One-Tap Availability Controls (`BedLinkCounterControl` steppers with strict non-negative and capacity ceiling bounds).
-    - Sub-phase 8.4: Data Freshness Protocol (`HospitalFreshnessBar` with Confirm No Change action and interactive simulate-stale evaluation toggle).
-    - Sub-phase 8.5: Incoming Emergency Triage Desk (`/hospital/requests`) with 120-second countdown timer, patient acuity, chief complaint, and required resource chips.
-    - Sub-phase 8.6: Accept / Divert Triage Actions (Accept transitions available $\to$ held and creates active hold; Divert logs clinical reason; 120s timeout simulation).
-    - Sub-phase 8.7: Active Holds & Inbound Transit (`/hospital/holds`) displaying inbound ambulance callsigns, live ETAs, reserved beds breakdown, patient check-in ("CONFIRM ARRIVED"), and capacity release controls ("RELEASE HOLD").
-    - Sub-phase 8.8: Integration, Responsive Testing & Verification (320dp width audit, 17 unit and widget tests passing in hospital suites).
-  - `PHASE_8_REPORT.md` generated at root.
+  - Resolved manual test defect: eliminated silent Mumbai coordinate fallback (`18.9980, 72.8300`) in real mode.
+  - Bound `locationRepositoryProvider` dynamically to `hospitalRepository.isRealBackend`: resolves `GeolocatorLocationRepository` in real mode and `MockLocationRepository` in offline/mock mode.
+  - Initialized `AmbulanceLocationState.initial` with `location: null` when backed by real backend.
+  - Enforced GPS permission gate in `MatchingNotifier.runSearchProgression`: halts search, clears matches, and surfaces actionable error prompt when location services are disabled or permission denied/deniedForever.
+  - Added dedicated actionable status cards to `HospitalDiscoveryScreen`:
+    - `SERVICE DISABLED`: "LOCATION SERVICES DISABLED" with buttons "OPEN LOCATION SETTINGS" / "RETRY".
+    - `PERMISSION DENIED`: "LOCATION ACCESS REQUIRED" with button "ALLOW LOCATION".
+    - `PERMISSION DENIED FOREVER`: "LOCATION PERMISSION BLOCKED" with button "OPEN APP SETTINGS".
+    - `ERROR / TIMEOUT`: "UNABLE TO GET CURRENT LOCATION" with button "RETRY LOCATION".
+  - Implemented `openAppSettings()` and `openLocationSettings()` in `LocationRepository` via Geolocator.
+  - Added live GPS diagnostic section to `DevFixtureCenter` displaying location source (`REAL GPS` vs `MOCK FIXTURE`), status, and coordinates.
+  - Added 8 integration tests in `test/features/matching/location_discovery_integration_test.dart` validating permission flow, real repo selection, null coordinates on error, halted discovery on denied permission, settings action, exact coordinates propagation, and coordinate-dependent hospital ranking.
+  - Preserved working tree without creating new commits.
+
+## Architecture & Integration Details
+- **Location Provider Location:** `lib/core/services/location/location_provider.dart`
+- **Location Repository:** `lib/core/services/location/location_repository.dart`
+- **Geolocator Implementation:** `lib/core/services/location/geolocator_location_repository.dart`
+- **Discovery Provider:** `lib/features/matching/presentation/providers/hospital_discovery_provider.dart`
+- **Matching Provider:** `lib/features/matching/presentation/providers/matching_provider.dart`
+- **Matching Screen:** `lib/features/matching/presentation/screens/hospital_discovery_screen.dart`
+- **Dev Fixture Center:** `lib/shared/widgets/demo/dev_fixture_center.dart`
 
 ## Verification results
-- `flutter analyze`: 0 issues found (strict analysis enabled).
-- `flutter test`: 134/134 tests passed across 21 suites (100% pass rate).
-- `flutter build web`: Built cleanly to `build/web` (exit code 0).
-- Compact viewport validation: 320dp, 360dp, 375dp, 390dp widths verified with zero RenderFlex overflow.
-
-## Current files
-- `lib/core/theme/*`
-- `lib/shared/models/*`, `lib/shared/providers/*`, `lib/shared/widgets/*`
-- `lib/features/auth/*`
-- `lib/features/ambulance/*`
-- `lib/features/hospital/*` (domain models, providers, widgets, screens)
-- `lib/features/matching/*`
-- `lib/features/reservation/*`
-- `lib/features/navigation/*`
-- `lib/features/design_system/*`
-- `lib/app/router.dart`, `lib/app/app.dart`, `lib/main.dart`
-- `test/*`
-- `PHASE_1_REPORT.md` through `PHASE_8_REPORT.md`
+- `flutter analyze`: 0 issues found (clean static analysis).
+- `flutter test --concurrency=1`: 269/269 tests passed across all test suites (100% pass rate).
+- `flutter build web --release --dart-define-from-file=config/supabase.json`: Built cleanly (exit code 0).
+- Working tree: All edits remain unstaged/uncommitted awaiting manual testing.
 
 ## Next recommended task
-Proceed to Phase 9 — Active Navigation & Live Transit Frontend upon user instruction.
+User manual testing of real location acquisition and hospital discovery in web/device runtime. Following approval, run `git add . && git commit -m "chore(phase-13): approve location and discovery integration"`.

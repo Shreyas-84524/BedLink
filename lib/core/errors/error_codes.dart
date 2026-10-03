@@ -12,5 +12,7 @@ class ErrorCodes {
   static const String allRejected = 'ALL_REJECTED';
   static const String allTimedOut = 'ALL_TIMED_OUT';
   static const String networkError = 'NETWORK_ERROR';
+  static const String rlsDenied = 'RLS_DENIED';
+  static const String repositoryError = 'REPOSITORY_ERROR';
   static const String unknownError = 'UNKNOWN_ERROR';
 }

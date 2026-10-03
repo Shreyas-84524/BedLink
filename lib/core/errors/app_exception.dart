@@ -39,3 +39,41 @@ class NetworkException extends AppException {
     super.cause,
   }) : super(message: message);
 }
+
+class HospitalRepositoryException extends AppException {
+  const HospitalRepositoryException(
+    String message, {
+    super.code = ErrorCodes.repositoryError,
+    this.isRlsBlock = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isRlsBlock;
+}
+
+class BedRepositoryException extends AppException {
+  const BedRepositoryException(
+    String message, {
+    super.code = ErrorCodes.repositoryError,
+    this.isRlsBlock = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isRlsBlock;
+}
+
+class LocationException extends AppException {
+  const LocationException(
+    String message, {
+    super.code = ErrorCodes.noLocation,
+    this.isServiceDisabled = false,
+    this.isPermissionDenied = false,
+    this.isPermanentlyDenied = false,
+    super.cause,
+  }) : super(message: message);
+
+  final bool isServiceDisabled;
+  final bool isPermissionDenied;
+  final bool isPermanentlyDenied;
+}
+

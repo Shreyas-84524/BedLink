@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/location/location_models.dart';
+import '../../../../core/services/location/location_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/badges/bedlink_badge.dart';
 import '../../../../shared/widgets/buttons/bedlink_button.dart';
 import '../../../../shared/widgets/cards/bedlink_card.dart';
+import '../../../../shared/widgets/inputs/bedlink_validation_message.dart';
 import '../../domain/models/hospital_match.dart';
 import '../providers/matching_provider.dart';
 import '../providers/selected_hospital_provider.dart';
@@ -31,7 +34,13 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
   @override
   void initState() {
     super.initState();
-    // Search is ready by default from matchingProvider.initial()
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final matchingState = ref.read(matchingProvider);
+      if (matchingState.isRealBackend && !matchingState.hasSearched) {
+        ref.read(matchingProvider.notifier).runSearchProgression();
+      }
+    });
   }
 
   void _handleRequestHold(HospitalMatch hospital) {
@@ -43,6 +52,7 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
   Widget build(BuildContext context) {
     final matchingState = ref.watch(matchingProvider);
     final matchingNotifier = ref.read(matchingProvider.notifier);
+    final locState = ref.watch(ambulanceLocationProvider);
 
     return AppScaffold(
       title: 'HOSPITAL MATCHES',
@@ -82,8 +92,107 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
               _buildFilterAndFixtureBar(matchingState, matchingNotifier),
               const SizedBox(height: 12),
 
-              // Content: Results or Empty State
-              if (matchingState.matches.isEmpty)
+              if (matchingState.isRlsBlocked) ...[
+                const BedLinkValidationMessage(
+                  message:
+                      'SUPABASE CONNECTED (RLS DEFAULT-DENY ACTIVE) • Live reads require client SELECT policy approval. Showing cached seed directory.',
+                  severity: ValidationSeverity.warning,
+                ),
+                const SizedBox(height: 12),
+              ] else if (matchingState.isRealBackend) ...[
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    BedLinkBadge(
+                      label:
+                          'DATA SOURCE: SUPABASE CLOUD (${matchingState.matches.length} HOSPITALS)',
+                      backgroundColor: AppColors.tealSurface,
+                      textColor: AppColors.tealDark,
+                      borderColor: AppColors.tealBorder,
+                      isMonospaced: true,
+                    ),
+                    if (matchingState.ambulanceLatitude != null &&
+                        matchingState.ambulanceLongitude != null)
+                      BedLinkBadge(
+                        label:
+                            'GPS: ${matchingState.ambulanceLatitude!.toStringAsFixed(4)}, ${matchingState.ambulanceLongitude!.toStringAsFixed(4)} (${matchingState.searchRadiusKm}KM RADIUS)',
+                        backgroundColor: AppColors.surfaceSubtle,
+                        textColor: AppColors.textPrimary,
+                        borderColor: AppColors.borderSubtle,
+                        isMonospaced: true,
+                      ),
+                  ],
+                ),
+                if (matchingState.unsupportedRequirements.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  BedLinkValidationMessage(
+                    message:
+                        'NOTE: Backend inventory does not track live status for: ${matchingState.unsupportedRequirements.join(", ")}. Marked as unverified.',
+                    severity: ValidationSeverity.info,
+                  ),
+                ],
+                const SizedBox(height: 12),
+              ],
+
+              // Content: Location Action Card, Results, or Empty State
+              if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  locState.status == LocationStateStatus.serviceDisabled) ...[
+                _buildLocationActionCard(
+                  title: 'LOCATION SERVICES DISABLED',
+                  description:
+                      'Device location services are turned off. Please enable GPS in device settings to discover nearby hospitals.',
+                  icon: Icons.location_off_rounded,
+                  buttonLabel: 'OPEN LOCATION SETTINGS',
+                  buttonIcon: Icons.settings_rounded,
+                  onPrimaryTap: () => ref
+                      .read(ambulanceLocationProvider.notifier)
+                      .openLocationSettings(),
+                  secondaryButtonLabel: 'RETRY',
+                  onSecondaryTap: () => matchingNotifier.runSearchProgression(),
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  locState.status == LocationStateStatus.permissionDenied) ...[
+                _buildLocationActionCard(
+                  title: 'LOCATION ACCESS REQUIRED',
+                  description:
+                      'BedLink requires location permission to calculate distance and find the nearest emergency hospital.',
+                  icon: Icons.location_disabled_rounded,
+                  buttonLabel: 'ALLOW LOCATION',
+                  buttonIcon: Icons.check_circle_outline_rounded,
+                  onPrimaryTap: () => matchingNotifier.runSearchProgression(),
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  locState.status == LocationStateStatus.permissionDeniedForever) ...[
+                _buildLocationActionCard(
+                  title: 'LOCATION PERMISSION BLOCKED',
+                  description:
+                      'Location permission is permanently blocked in system settings. Please enable location permissions to continue.',
+                  icon: Icons.block_rounded,
+                  variant: BedLinkCardVariant.critical,
+                  buttonLabel: 'OPEN APP SETTINGS',
+                  buttonIcon: Icons.settings_rounded,
+                  onPrimaryTap: () => ref
+                      .read(ambulanceLocationProvider.notifier)
+                      .openAppSettings(),
+                ),
+              ] else if (matchingState.isRealBackend &&
+                  !matchingState.isSearching &&
+                  locState.status == LocationStateStatus.error) ...[
+                _buildLocationActionCard(
+                  title: 'UNABLE TO GET CURRENT LOCATION',
+                  description: locState.errorMessage ??
+                      'Failed to acquire device GPS coordinates. Please check your signal and try again.',
+                  icon: Icons.error_outline_rounded,
+                  variant: BedLinkCardVariant.critical,
+                  buttonLabel: 'RETRY LOCATION',
+                  buttonIcon: Icons.refresh_rounded,
+                  onPrimaryTap: () => matchingNotifier.runSearchProgression(),
+                ),
+              ] else if (matchingState.matches.isEmpty)
                 _buildEmptyState(matchingNotifier)
               else ...[
                 // Section Header: Top Match
@@ -258,6 +367,65 @@ class _HospitalDiscoveryScreenState extends ConsumerState<HospitalDiscoveryScree
             variant: BedLinkButtonVariant.secondary,
             onPressed: () => context.go('/ambulance/requirements'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationActionCard({
+    required String title,
+    required String description,
+    required IconData icon,
+    required String buttonLabel,
+    required IconData buttonIcon,
+    required VoidCallback onPrimaryTap,
+    String? secondaryButtonLabel,
+    VoidCallback? onSecondaryTap,
+    BedLinkCardVariant variant = BedLinkCardVariant.warning,
+  }) {
+    return BedLinkCard(
+      variant: variant,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Icon(
+              icon,
+              color: variant == BedLinkCardVariant.critical
+                  ? AppColors.criticalRed
+                  : AppColors.warningAmber,
+              size: 40,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: AppTypography.cardTitle,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: AppTypography.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          BedLinkButton(
+            label: buttonLabel,
+            icon: buttonIcon,
+            variant: BedLinkButtonVariant.primary,
+            onPressed: onPrimaryTap,
+          ),
+          if (secondaryButtonLabel != null && onSecondaryTap != null) ...[
+            const SizedBox(height: 8),
+            BedLinkButton(
+              label: secondaryButtonLabel,
+              icon: Icons.refresh_rounded,
+              variant: BedLinkButtonVariant.secondary,
+              onPressed: onSecondaryTap,
+            ),
+          ],
         ],
       ),
     );

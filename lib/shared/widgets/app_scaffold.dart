@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import 'chrome/bedlink_app_bar.dart';
+import 'chrome/connectivity_banner.dart';
 
-/// Reusable structural scaffold for BedLink screens with consistent BedLinkAppBar and role chrome.
+/// Reusable structural scaffold for BedLink screens with consistent BedLinkAppBar,
+/// role chrome, and automated resilience connectivity banners.
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
     required this.child,
@@ -12,6 +14,7 @@ class AppScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.showLiveBadge = true,
     this.showBackButton = true,
+    this.showConnectivityBanner = true,
     super.key,
   });
 
@@ -22,6 +25,7 @@ class AppScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final bool showLiveBadge;
   final bool showBackButton;
+  final bool showConnectivityBanner;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +39,14 @@ class AppScaffold extends StatelessWidget {
         actions: actions,
       ),
       body: SafeArea(
-        child: child,
+        child: showConnectivityBanner
+            ? Column(
+                children: [
+                  const ConnectivityBanner(),
+                  Expanded(child: child),
+                ],
+              )
+            : child,
       ),
       bottomNavigationBar: bottomNavigationBar,
     );

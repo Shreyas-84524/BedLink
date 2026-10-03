@@ -1314,3 +1314,40 @@ The system focuses not just on discovering hospitals, but on coordinating the co
 ## Tagline
 
 > **Right bed. Right hospital. Right now.**
+
+---
+
+## Developer Setup & Build Scripts
+
+### 1. Environment Configuration
+
+BedLink reads Supabase credentials securely via Flutter's compile-time `--dart-define-from-file` mechanism:
+
+- Copy the example configuration template:
+  ```bash
+  cp config/supabase.example.json config/supabase.json
+  ```
+- Fill in your project URL and public anon key in `config/supabase.json`.
+- **Note:** `config/supabase.json` contains local project secrets and is strictly ignored by Git. Never commit or document actual key values.
+
+### 2. Execution & Build Scripts (Windows PowerShell)
+
+Convenience scripts are provided in the `scripts/` directory:
+
+- **Local Run (Development):**
+  ```powershell
+  .\scripts\run.ps1
+  ```
+- **Web Release Build:**
+  ```powershell
+  .\scripts\build-web.ps1
+  ```
+- **Android APK Build:**
+  ```powershell
+  .\scripts\build-apk.ps1
+  ```
+- **Android App Bundle Build:**
+  ```powershell
+  .\scripts\build-appbundle.ps1
+  ```
+
